@@ -1,60 +1,91 @@
-import { Document, View, Text, StyleSheet } from "@react-pdf/renderer";
-import { BasePage, Signature, COLORS } from "@/lib/pdf/letterhead";
+import { Document, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import { BasePage, COLORS } from "@/lib/pdf/letterhead";
+import { BRAND } from "@/lib/pdf/fonts";
 import { formatAmount } from "@/lib/utils/money";
 import { formatDocDate } from "@/lib/utils/dates";
 import type { InvoiceWithItems, CompanySettings } from "@/lib/types";
 
 const b = { fontFamily: "Calibri", fontWeight: "bold" } as const;
-
-// Column x-offsets within the table (content coordinates; measured from the
-// original INVOICE 2-2 template, page-x minus the 34pt left padding).
-const X = {
-  item: 7, // item no. "10."
-  col2: 56, // code / "Net Price" / net value
-  qty: 79, // quantity "1"
-  vat: 118, // "VAT"
-  tax: 154, // "Taxes" / "7.50%"
-  desc: 182, // description
-  unitL: 300,
-  unitW: 113, // unit price, right-aligned to 413
-  amtL: 430,
-  amtW: 92, // amount ₦, right-aligned to 522
-};
-const BLOCK_H = 66;
+const qtyText = (q: number | string) => formatAmount(q).replace(/\.00$/, "");
 
 const s = StyleSheet.create({
-  head: { flexDirection: "row", marginBottom: 10 },
+  // ---- header ----
+  head: { flexDirection: "row", alignItems: "flex-start", marginTop: 14 },
   nameBox: {
-    width: 250,
-    minHeight: 74,
+    width: 258,
+    minHeight: 78,
     borderWidth: 1,
     borderColor: COLORS.line,
-    borderRadius: 10,
-    padding: 8,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     justifyContent: "center",
   },
   invBox: {
-    width: 130,
-    minHeight: 74,
-    marginLeft: 8,
+    width: 132,
+    minHeight: 78,
+    marginLeft: 10,
     borderWidth: 1,
     borderColor: COLORS.line,
-    padding: 6,
+    padding: 8,
   },
-  tinBox: { flex: 1, paddingLeft: 14, paddingTop: 20 },
+  tinBox: { flex: 1, paddingLeft: 16, paddingTop: 18 },
   leaderRow: { flexDirection: "row", alignItems: "flex-end" },
-  leader: { flex: 1, borderBottomWidth: 1, borderBottomColor: COLORS.line, marginLeft: 2, paddingBottom: 1, fontSize: 12 },
+  label: { fontSize: 11.5 },
+  leader: {
+    flex: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line,
+    marginLeft: 2,
+    paddingBottom: 1,
+    textAlign: "center",
+    fontSize: 12,
+  },
   underline: { textDecoration: "underline" },
 
-  table: { borderWidth: 1, borderColor: COLORS.line },
-  header: { height: 42, borderBottomWidth: 1, borderColor: COLORS.line },
-  hcell: { position: "absolute", fontFamily: "Calibri", fontWeight: "bold", fontSize: 11.5 },
-  block: { height: BLOCK_H, borderBottomWidth: 1, borderColor: COLORS.line },
-  cell: { position: "absolute", fontSize: 11.5 },
-  amt: { position: "absolute", width: X.amtW, left: X.amtL, textAlign: "right", fontSize: 11.5 },
-  unit: { position: "absolute", width: X.unitW, left: X.unitL, textAlign: "right", fontSize: 11.5 },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", height: 26, paddingHorizontal: 6 },
-  wordsBox: { borderWidth: 1, borderColor: COLORS.line, borderTopWidth: 0, paddingHorizontal: 6, paddingVertical: 5 },
+  // ---- table ----
+  table: { marginTop: 10, borderWidth: 1, borderColor: COLORS.line },
+  header: { borderBottomWidth: 1, borderColor: COLORS.line, paddingTop: 2, paddingBottom: 4 },
+  row: { flexDirection: "row", alignItems: "flex-start" },
+  cItem: { width: 50 },
+  cMid: { width: 132 },
+  cDesc: { flex: 1 },
+  cUnit: { width: 80, textAlign: "center", fontSize: 12, lineHeight: 1.05 },
+  cAmt: { width: 92, textAlign: "right", paddingRight: 5, fontSize: 12, lineHeight: 1.05 },
+
+  th: { fontFamily: "Calibri", fontWeight: "bold", fontSize: 11.5 },
+  block: { borderBottomWidth: 1, borderColor: COLORS.line, paddingTop: 2, paddingBottom: 3 },
+  code: { textAlign: "center", fontSize: 11.5, color: COLORS.muted, lineHeight: 1.05 },
+  desc: { paddingLeft: 28, paddingRight: 4, fontSize: 12, lineHeight: 1.1 },
+  bt: { fontSize: 12, lineHeight: 1.05 },
+
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+
+  thanks: { marginTop: 3, marginLeft: 30, fontSize: 12 },
+  wordsBox: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  sigBox: {
+    marginTop: 10,
+    width: 470,
+    height: 48,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 8,
+    justifyContent: "center",
+    paddingLeft: 40,
+  },
+  sigImg: { width: 96, height: 38, objectFit: "contain" },
 });
 
 function ItemBlock({
@@ -64,28 +95,57 @@ function ItemBlock({
   item: InvoiceWithItems["items"][number];
   index: number;
 }) {
+  const rate = Number(item.vat_rate).toFixed(2);
   return (
-    <View style={s.block}>
-      {/* Row A: code · description · unit price · net amount */}
-      <Text style={[s.cell, { left: X.col2, top: 2, color: COLORS.muted }]}>{item.item_code ?? ""}</Text>
-      <Text style={[s.cell, { left: X.desc, top: 2, width: 190 }]}>{item.description}</Text>
-      <Text style={[s.unit, { top: 2 }]}>{formatAmount(item.unit_price)}</Text>
-      <Text style={[s.amt, { top: 2 }]}>{formatAmount(item.net_amount)}</Text>
+    <View style={s.block} wrap={false}>
+      {/* Row 1: code · description · unit price · net amount */}
+      <View style={s.row}>
+        <View style={s.cItem} />
+        <View style={s.cMid}>
+          <Text style={s.code}>{item.item_code ?? ""}</Text>
+        </View>
+        <View style={s.cDesc}>
+          <Text style={s.desc}>{item.description}</Text>
+        </View>
+        <Text style={s.cUnit}>{formatAmount(item.unit_price)}</Text>
+        <Text style={s.cAmt}>{formatAmount(item.net_amount)}</Text>
+      </View>
 
-      {/* Row B: item no · qty · VAT Taxes · vat amount */}
-      <Text style={[s.cell, { left: X.item, top: 24 }]}>{(index + 1) * 10}.</Text>
-      <Text style={[s.cell, { left: X.qty, top: 24 }]}>{formatAmount(item.qty).replace(/\.00$/, "")}</Text>
-      <Text style={[s.cell, { left: X.vat, top: 24 }]}>VAT</Text>
-      <Text style={[s.cell, b, { left: X.tax, top: 24 }]}>Taxes</Text>
-      <Text style={[s.amt, { top: 24 }]}>{formatAmount(item.vat_amount)}</Text>
+      {/* Row 2: item no · qty · VAT Taxes · vat amount */}
+      <View style={[s.row, { marginTop: 4 }]}>
+        <Text style={[s.cItem, s.bt, { paddingLeft: 7 }]}>{(index + 1) * 10}.</Text>
+        <View style={[s.cMid, { flexDirection: "row" }]}>
+          <Text style={[s.bt, { width: 68, textAlign: "center" }]}>{qtyText(item.qty)}</Text>
+          <Text style={s.bt}>VAT </Text>
+          <Text style={[b, s.bt]}>Taxes</Text>
+        </View>
+        <View style={s.cDesc} />
+        <Text style={s.cUnit}> </Text>
+        <Text style={s.cAmt}>{formatAmount(item.vat_amount)}</Text>
+      </View>
 
-      {/* Row C: Net Price · rate% */}
-      <Text style={[s.cell, b, { left: X.col2, top: 38 }]}>Net Price</Text>
-      <Text style={[s.cell, { left: X.tax, top: 38 }]}>{Number(item.vat_rate).toFixed(2)}%</Text>
+      {/* Row 3: Net Price · rate% */}
+      <View style={[s.row, { marginTop: 1 }]}>
+        <View style={s.cItem} />
+        <View style={[s.cMid, { flexDirection: "row" }]}>
+          <Text style={[b, s.bt, { width: 106, paddingLeft: 11 }]}>Net Price</Text>
+          <Text style={s.bt}>{rate}%</Text>
+        </View>
+        <View style={s.cDesc} />
+        <Text style={s.cUnit}> </Text>
+        <Text style={s.cAmt}> </Text>
+      </View>
 
-      {/* Row D: net value · gross (bold) */}
-      <Text style={[s.cell, { left: X.col2, top: 53 }]}>{formatAmount(item.net_amount)}</Text>
-      <Text style={[s.amt, b, { top: 53 }]}>{formatAmount(item.gross_amount)}</Text>
+      {/* Row 4: net value · gross (bold) */}
+      <View style={[s.row, { marginTop: 1 }]}>
+        <View style={s.cItem} />
+        <View style={s.cMid}>
+          <Text style={{ paddingLeft: 6, fontSize: 11.5, lineHeight: 1.05 }}>{formatAmount(item.net_amount)}</Text>
+        </View>
+        <View style={s.cDesc} />
+        <Text style={s.cUnit}> </Text>
+        <Text style={[s.cAmt, b]}>{formatAmount(item.gross_amount)}</Text>
+      </View>
     </View>
   );
 }
@@ -107,25 +167,29 @@ export function InvoicePdf({
         <View style={s.head}>
           <View style={s.nameBox}>
             <View style={s.leaderRow}>
-              <Text style={{ fontSize: 12 }}>Name: </Text>
-              <Text style={[s.leader, { textAlign: "center" }]}>{doc.customer_name}</Text>
+              <Text style={s.label}>Name: </Text>
+              <Text style={s.leader}>{doc.customer_name}</Text>
             </View>
-            <View style={[s.leaderRow, { marginTop: 8 }]}>
-              <Text style={{ fontSize: 12 }}>Address: </Text>
-              <Text style={[s.leader, { textAlign: "center" }]}>{addr[0] ?? ""}</Text>
+            <View style={[s.leaderRow, { marginTop: 10 }]}>
+              <Text style={s.label}>Address: </Text>
+              <Text style={s.leader}>{addr[0] ?? ""}</Text>
             </View>
-            <View style={[s.leaderRow, { marginTop: 8 }]}>
-              <Text style={[s.leader, { textAlign: "center" }]}>{addr[1] ?? ""}</Text>
+            <View style={[s.leaderRow, { marginTop: 10 }]}>
+              <Text style={s.leader}>{addr[1] ?? ""}</Text>
             </View>
           </View>
 
           <View style={s.invBox}>
             <Text style={[b, s.underline, { fontSize: 12 }]}>Invoice</Text>
-            <Text style={[b, { fontSize: 18, marginTop: 1 }]}>Nº {doc.invoice_no}</Text>
-            <Text style={{ fontSize: 10, color: COLORS.muted }}>Customer&apos;s Number</Text>
-            <View style={[s.leaderRow, { marginTop: 4 }]}>
+            <Text style={[b, { fontSize: 18, marginTop: 2 }]}>Nº {doc.invoice_no}</Text>
+            <Text style={{ fontSize: 10, color: COLORS.muted, marginTop: 2 }}>
+              Customer&apos;s Number
+            </Text>
+            <View style={[s.leaderRow, { marginTop: 6 }]}>
               <Text style={{ fontSize: 11 }}>Date: </Text>
-              <Text style={[s.leader, { fontSize: 11 }]}>{formatDocDate(doc.invoice_date)}</Text>
+              <Text style={[s.leader, { textAlign: "left", fontSize: 11 }]}>
+                {formatDocDate(doc.invoice_date)}
+              </Text>
             </View>
           </View>
 
@@ -134,7 +198,7 @@ export function InvoicePdf({
               <Text style={b}>TIN NO: </Text>
               {tin}
             </Text>
-            <Text style={{ fontSize: 12, marginTop: 10 }}>
+            <Text style={{ fontSize: 12, marginTop: 12 }}>
               <Text style={b}>P.O NO: </Text>
               {doc.po_no ?? ""}
             </Text>
@@ -143,14 +207,24 @@ export function InvoicePdf({
 
         {/* Items table */}
         <View style={s.table}>
-          <View style={s.header}>
-            <Text style={[s.hcell, { left: 452, top: 3, width: 80, textAlign: "center" }]}>Amount</Text>
-            <Text style={[s.hcell, { left: X.item, top: 18 }]}>Item</Text>
-            <Text style={[s.hcell, { left: 52, top: 18 }]}>Quantity</Text>
-            <Text style={[s.hcell, { left: X.desc, top: 18 }]}>Description</Text>
-            <Text style={[s.hcell, { left: 362, top: 18 }]}>Unit Price</Text>
-            <Text style={[s.hcell, { left: 459, top: 18 }]}>₦</Text>
-            <Text style={[s.hcell, { left: 516, top: 18 }]}>K</Text>
+          <View style={s.header} wrap={false}>
+            <View style={s.row}>
+              <View style={s.cItem} />
+              <View style={s.cMid} />
+              <View style={s.cDesc} />
+              <Text style={{ width: 80 }}> </Text>
+              <Text style={[s.th, { width: 92, textAlign: "center" }]}>Amount</Text>
+            </View>
+            <View style={[s.row, { marginTop: 2 }]}>
+              <Text style={[s.th, { width: 50, paddingLeft: 6 }]}>Item</Text>
+              <Text style={[s.th, { width: 132, textAlign: "center" }]}>Quantity</Text>
+              <Text style={[s.th, { flex: 1, textAlign: "center" }]}>Description</Text>
+              <Text style={[s.th, { width: 80, textAlign: "center" }]}>Unit Price</Text>
+              <View style={{ width: 92, flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 6 }}>
+                <Text style={s.th}>₦</Text>
+                <Text style={s.th}>K</Text>
+              </View>
+            </View>
           </View>
 
           {doc.items.map((it, i) => (
@@ -163,19 +237,24 @@ export function InvoicePdf({
           </View>
         </View>
 
-        <Text style={{ marginTop: 3, marginLeft: 30, fontSize: 12 }}>
-          Thank you for Patronage please call again.
-        </Text>
+        <Text style={s.thanks}>Thank you for Patronage please call again.</Text>
 
         {doc.amount_in_words ? (
-          <View style={[s.wordsBox, { marginTop: 8, borderTopWidth: 1 }]}>
+          <View style={s.wordsBox}>
             <Text style={{ fontSize: 12 }}>
               Amount In Word: <Text style={b}>{doc.amount_in_words}</Text>
             </Text>
           </View>
         ) : null}
 
-        <Signature prefix="For: " name="Bade Automobile Ltd" />
+        {/* Signature */}
+        <View style={s.sigBox}>
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
+          <Image src={BRAND.signature} style={s.sigImg} />
+        </View>
+        <Text style={{ marginTop: 3, fontSize: 12 }}>
+          For: <Text style={b}>Bade Automobile Ltd</Text>
+        </Text>
       </BasePage>
     </Document>
   );

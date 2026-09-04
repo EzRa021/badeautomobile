@@ -9,14 +9,17 @@ export const COLORS = {
   faint: "#8a8f98",
 };
 
+// The printed letterhead band occupies roughly the top 115pt of the page.
+const LETTERHEAD_CLEARANCE = 80; // + page paddingTop (40) => content starts ~120
+
 export const styles = StyleSheet.create({
   page: {
     fontFamily: "Calibri",
     fontSize: 12,
     color: COLORS.ink,
     lineHeight: 1.3,
-    paddingTop: 120, // clear the printed letterhead band
-    paddingBottom: 54,
+    paddingTop: 40,
+    paddingBottom: 40,
     paddingHorizontal: 54,
   },
   bg: {
@@ -26,6 +29,7 @@ export const styles = StyleSheet.create({
     width: 595.28,
     height: 841.89,
   },
+  firstPageClear: { height: LETTERHEAD_CLEARANCE },
   bold: { fontFamily: "Calibri", fontWeight: "bold" },
   right: { textAlign: "right" },
   center: { textAlign: "center" },
@@ -33,27 +37,40 @@ export const styles = StyleSheet.create({
   signatureImg: { width: 92, height: 36, objectFit: "contain" },
 });
 
-/** A page with the exact company letterhead + watermark as the background. */
+/**
+ * A page with the company letterhead + watermark as the background.
+ * The letterhead is drawn on the FIRST page only; when content overflows onto
+ * further pages they start near the top with no repeated letterhead.
+ */
 export function BasePage({
   children,
   paddingHorizontal,
-  paddingTop,
 }: {
   children: React.ReactNode;
   paddingHorizontal?: number;
-  paddingTop?: number;
 }) {
   return (
     <Page
       size="A4"
-      style={[
-        styles.page,
-        paddingHorizontal != null ? { paddingHorizontal } : {},
-        paddingTop != null ? { paddingTop } : {},
-      ]}
+      style={[styles.page, paddingHorizontal != null ? { paddingHorizontal } : {}]}
     >
-      {/* eslint-disable-next-line jsx-a11y/alt-text */}
-      <Image src={BRAND.letterhead} style={styles.bg} fixed />
+      {/*
+        Fixed wrapper (out of flow, so it never affects pagination) anchored to
+        the page top-left. Its render draws the letterhead on page 1 only, so
+        continuation pages get no letterhead.
+      */}
+      <View
+        fixed
+        style={styles.bg}
+        render={({ pageNumber }) =>
+          pageNumber === 1 ? (
+            // eslint-disable-next-line jsx-a11y/alt-text
+            <Image src={BRAND.letterhead} style={{ width: "100%", height: "100%" }} />
+          ) : null
+        }
+      />
+      {/* In-flow spacer clears the letterhead on page 1 only. */}
+      <View style={styles.firstPageClear} />
       {children}
     </Page>
   );
