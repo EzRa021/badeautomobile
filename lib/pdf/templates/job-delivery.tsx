@@ -7,7 +7,7 @@ const b = { fontFamily: "Calibri", fontWeight: "bold" } as const;
 
 const s = StyleSheet.create({
   head: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-  leftCol: { flex: 1, fontSize: 12 },
+  leftCol: { flex: 1, fontSize: 12, paddingTop: 22 },
   rightCol: { width: 190 },
   poNo: { fontSize: 12, marginBottom: 4 },
   box: { borderWidth: 1, borderColor: COLORS.line },
@@ -20,7 +20,7 @@ const s = StyleSheet.create({
     fontSize: 11,
     color: COLORS.muted,
   },
-  boxValue: { flex: 1, padding: 4, fontSize: 12 },
+  boxValue: { flex: 1, padding: 4, fontSize: 13 },
   tin: { textAlign: "right", marginTop: 6, fontSize: 12 },
   titleWrap: {
     alignSelf: "center",
@@ -29,12 +29,13 @@ const s = StyleSheet.create({
     borderRadius: 22,
     paddingVertical: 5,
     paddingHorizontal: 26,
-    marginTop: 14,
-    marginBottom: 14,
+    marginTop: 12,
+    marginBottom: 12,
   },
-  title: { fontSize: 18, fontFamily: "Calibri", fontWeight: "bold", textAlign: "center" },
-  field: { marginTop: 9, fontSize: 12 },
-  fieldRow: { flexDirection: "row", alignItems: "flex-end" },
+  title: { fontSize: 19, fontFamily: "Calibri", fontWeight: "bold", textAlign: "center" },
+
+  fieldRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 9, fontSize: 12 },
+  contRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 6 },
   leader: {
     flex: 1,
     borderBottomWidth: 1,
@@ -42,19 +43,26 @@ const s = StyleSheet.create({
     borderStyle: "dashed",
     marginLeft: 4,
     paddingBottom: 1,
+    fontSize: 12,
   },
-  handoverRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 8, fontSize: 12 },
-  handoverLabel: { width: 190 },
+  phrase: { fontSize: 12, paddingHorizontal: 4 },
+  handoverRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 9, fontSize: 12 },
+  handoverLabel: { width: 190, fontSize: 12 },
 });
 
-/** A labelled field with the value sitting on a dotted leader line. */
-function Field({ label, value, inline }: { label: string; value?: string | null; inline?: React.ReactNode }) {
+/** A labelled field: value left-aligned on a dotted leader, plus `extra` empty dotted lines. */
+function Field({ label, value, extra = 0 }: { label: string; value?: string | null; extra?: number }) {
   return (
-    <View style={s.field}>
+    <View>
       <View style={s.fieldRow}>
         <Text>{label}</Text>
-        <Text style={s.leader}>{inline ?? (value ?? "")}</Text>
+        <Text style={s.leader}>{value ?? ""}</Text>
       </View>
+      {Array.from({ length: extra }).map((_, i) => (
+        <View key={i} style={s.contRow}>
+          <Text style={s.leader}> </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -71,17 +79,25 @@ export function JobDeliveryPdf({
 
   return (
     <Document title={`Job Delivery ${doc.jd_no}`} author="Bade Automobile Ltd">
-      <BasePage>
+      <BasePage paddingHorizontal={72}>
         {/* Header */}
         <View style={s.head}>
           <View style={s.leftCol}>
-            <Text><Text style={b}>TO: </Text>{doc.customer_name}</Text>
+            <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+              <Text style={b}>TO: </Text>
+              <Text style={s.leader}>{doc.customer_name}</Text>
+            </View>
             {addressLines.map((l, i) => (
-              <Text key={i}>{l}</Text>
+              <View key={i} style={s.contRow}>
+                <Text style={s.leader}>{l}</Text>
+              </View>
             ))}
           </View>
           <View style={s.rightCol}>
-            <Text style={s.poNo}><Text style={b}>PO No: </Text>{doc.po_no ?? ""}</Text>
+            <View style={{ flexDirection: "row", alignItems: "flex-end", marginBottom: 4 }}>
+              <Text style={{ fontSize: 12 }}>PO No: </Text>
+              <Text style={s.leader}>{doc.po_no ?? ""}</Text>
+            </View>
             <View style={s.box}>
               <View style={[s.boxRow, { borderBottomWidth: 1, borderColor: COLORS.line }]}>
                 <Text style={s.boxLabel}>Invoice No</Text>
@@ -92,7 +108,10 @@ export function JobDeliveryPdf({
                 <Text style={s.boxValue}>{formatDocDate(doc.delivery_date)}</Text>
               </View>
             </View>
-            <Text style={s.tin}><Text style={b}>TIN NO: </Text>{tin}</Text>
+            <Text style={s.tin}>
+              <Text style={b}>TIN NO: </Text>
+              {tin}
+            </Text>
           </View>
         </View>
 
@@ -101,23 +120,25 @@ export function JobDeliveryPdf({
           <Text style={s.title}>JOB DELIVERY REPORT</Text>
         </View>
 
-        {/* Work description: "<work> has been carried out on <vehicle>" */}
+        {/* Work description: <work> ...has been carried out on... <vehicle> */}
         <Text style={{ fontSize: 12 }}>Work Description:</Text>
         <View style={[s.fieldRow, { marginTop: 4 }]}>
-          <Text style={s.leader}>
-            {doc.work_done ?? ""}
-            {doc.vehicle ? `  has been carried out on  ${doc.vehicle}` : ""}
-          </Text>
+          <Text style={[s.leader, { textAlign: "center", marginLeft: 0 }]}>{doc.work_done ?? ""}</Text>
+          <Text style={s.phrase}>has been carried out on</Text>
+          <Text style={[s.leader, { textAlign: "center", marginLeft: 0 }]}>{doc.vehicle ?? ""}</Text>
+        </View>
+        <View style={s.contRow}>
+          <Text style={s.leader}> </Text>
         </View>
 
-        <Field label="Items Changed: " value={doc.items_changed} />
+        <Field label="Items Changed: " value={doc.items_changed} extra={1} />
         <Field label="Note: " value={doc.note} />
         <Field label="Next Service: " value={doc.next_service} />
-        <Field label="Accessories Found on Vehicle: " value={doc.accessories_found} />
-        <Field label="Accessories Returned with Vehicle: " value={doc.accessories_returned} />
+        <Field label="Accessories Found on Vehicle: " value={doc.accessories_found} extra={2} />
+        <Field label="Accessories Returned with Vehicle: " value={doc.accessories_returned} extra={2} />
 
-        {/* Handover block */}
-        <View style={{ marginTop: 18 }}>
+        {/* Handover block — values centered on their lines */}
+        <View style={{ marginTop: 16 }}>
           {[
             { label: "Date In and Time:", value: doc.date_in ? formatDateTime(doc.date_in) : "" },
             { label: "Date Out and Time:", value: doc.date_out ? formatDateTime(doc.date_out) : "" },
@@ -127,7 +148,7 @@ export function JobDeliveryPdf({
           ].map((f, i) => (
             <View style={s.handoverRow} key={i}>
               <Text style={s.handoverLabel}>{f.label}</Text>
-              <Text style={s.leader}>{f.value}</Text>
+              <Text style={[s.leader, { textAlign: "center" }]}>{f.value}</Text>
             </View>
           ))}
         </View>

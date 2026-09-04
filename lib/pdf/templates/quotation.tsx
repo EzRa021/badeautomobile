@@ -4,7 +4,7 @@ import { formatAmount } from "@/lib/utils/money";
 import { formatLongOrdinalDate } from "@/lib/utils/dates";
 import type { QuotationWithItems } from "@/lib/types";
 
-const MIN_ROWS = 13;
+const MIN_ROWS = 18;
 
 // Column widths as flex-basis percentages (from measured template geometry).
 const COL = { sn: "8%", desc: "46%", qty: "11%", rate: "17.5%", amount: "17.5%" } as const;
@@ -20,21 +20,24 @@ const s = StyleSheet.create({
     borderRightWidth: 1,
     borderBottomWidth: 1,
     borderColor: COLORS.line,
-    paddingVertical: 3,
+    paddingVertical: 1.5,
     paddingHorizontal: 4,
-    fontSize: 11.5,
+    fontSize: 13,
+    lineHeight: 1.1,
     justifyContent: "center",
   },
-  th: { fontFamily: "Calibri", fontWeight: "bold", textAlign: "center", fontSize: 12 },
+  th: { fontFamily: "Calibri", fontWeight: "bold", textAlign: "center", fontSize: 13, lineHeight: 1.05 },
   banner: {
     borderRightWidth: 1,
     borderBottomWidth: 1,
     borderColor: COLORS.line,
-    paddingVertical: 3,
+    paddingVertical: 1.5,
     paddingHorizontal: 6,
     fontFamily: "Calibri",
     fontWeight: "bold",
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 1.1,
+    textAlign: "center",
     width: "100%",
   },
   words: { marginTop: 14, fontFamily: "Calibri", fontWeight: "bold", fontSize: 12 },
@@ -53,7 +56,7 @@ export function QuotationPdf({ doc }: { doc: QuotationWithItems }) {
 
   return (
     <Document title={`Quotation ${doc.ref_no}`} author="Bade Automobile Ltd">
-      <BasePage>
+      <BasePage paddingHorizontal={66}>
         <View style={s.headerRow}>
           <Text style={s.ref}>Our Ref: {doc.ref_no}</Text>
           <Text style={s.date}>{formatLongOrdinalDate(doc.quote_date)}</Text>
