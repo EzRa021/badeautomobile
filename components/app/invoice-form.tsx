@@ -11,6 +11,8 @@ import { toNumber, round2 } from "@/lib/utils/money";
 import { amountToWords } from "@/lib/utils/number-to-words";
 import { LineItemsEditor, emptyRow, type Row, type ColumnDef } from "@/components/app/line-items-editor";
 import { PartyPicker, type PartyOption, type PartyValue } from "@/components/app/party-picker";
+import { ImportPoButton } from "@/components/app/import-po-button";
+import type { ParsedPo } from "@/lib/pdf/parse-nestle-po";
 import { DocumentTotals } from "@/components/app/document-totals";
 import { FormField } from "@/components/app/form-field";
 import { FormActionBar } from "@/components/app/form-action-bar";
@@ -106,6 +108,30 @@ export function InvoiceForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
+  function applyImport(p: ParsedPo) {
+    if (Array.isArray(p.items) && p.items.length) {
+      setRows(
+        p.items.map((it) =>
+          deriveRow({
+            item_code: it.item_code ?? "",
+            description: it.description ?? "",
+            qty: String(it.qty ?? 1),
+            unit_price: String(it.unit_price ?? 0),
+            amount: "",
+          }),
+        ),
+      );
+    }
+    setParty((prev) => ({
+      id: "",
+      name: p.customer_name ?? prev.name,
+      address: p.customer_address ?? prev.address,
+    }));
+    if (p.vat_rate) setVatRate(String(p.vat_rate));
+    const el = formRef.current?.elements.namedItem("po_no") as HTMLInputElement | null;
+    if (el && p.po_no) el.value = p.po_no;
+  }
+
   const cleanRows = useMemo(() => rows.filter((r) => r.description.trim()), [rows]);
   const subtotal = useMemo(
     () => round2(cleanRows.reduce((s, r) => s + toNumber(r.qty || "1") * toNumber(r.unit_price), 0)),
@@ -122,6 +148,18 @@ export function InvoiceForm({
         <input type="hidden" name="quotation_id" value={record?.quotation_id ?? fromQuotationId ?? ""} />
       )}
       <input type="hidden" name="items" value={JSON.stringify(cleanRows.map(({ amount: _a, ...r }) => r))} />
+
+      <Card className="border-primary/30 bg-brand-050/50">
+        <CardContent className="flex flex-col gap-3 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-medium">Import from a Nestlé purchase order</p>
+            <p className="text-sm text-muted-foreground">
+              Upload the PO PDF to auto-fill the customer, PO number and all line items.
+            </p>
+          </div>
+          <ImportPoButton onImport={applyImport} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
