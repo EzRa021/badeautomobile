@@ -1,26 +1,130 @@
 @import "tailwindcss";
 
+/*
+  Bade Automobile — "Workshop ledger" design system.
+  Palette from the BADE logo: deep automotive green (primary), warm amber (accent),
+  warm paper ground, near-black ink. Single committed light look.
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --radius: 0.5rem;
+
+  /* Brand */
+  --brand:      #145C3E;   /* deep green (gear) */
+  --brand-600:  #1E7A54;
+  --brand-050:  #E9F2EC;
+  --amber:      #E07B39;   /* BADE wordmark */
+  --amber-050:  #FBF0E6;
+
+  /* shadcn/ui semantic tokens */
+  --background:            #F6F5F1;   /* warm paper */
+  --foreground:            #191D24;
+  --card:                  #FFFFFF;
+  --card-foreground:       #191D24;
+  --popover:               #FFFFFF;
+  --popover-foreground:    #191D24;
+  --primary:               #145C3E;
+  --primary-foreground:    #F3FBF6;
+  --secondary:             #ECEFE9;
+  --secondary-foreground:  #26332B;
+  --muted:                 #EFEDE7;
+  --muted-foreground:      #6B7180;
+  --accent:               #EDF3EE;
+  --accent-foreground:     #1B3A2B;
+  --destructive:           #B0402A;
+  --destructive-foreground:#FCF3F0;
+  --border:                #E3E0D8;
+  --input:                 #DAD7CE;
+  --ring:                  #1E7A54;
+
+  /* Status hues (used by StatusBadge) */
+  --status-slate:  #64748B;
+  --status-green:  #157347;
+  --status-amber:  #C2701C;
+  --status-red:    #B0402A;
+  --status-blue:   #2563A6;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand: var(--brand);
+  --color-brand-600: var(--brand-600);
+  --color-brand-050: var(--brand-050);
+  --color-amber: var(--amber);
+  --color-amber-050: var(--amber-050);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-inter), sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    color-scheme: light;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--brand) 22%, transparent);
+  }
+  /* Visible keyboard focus everywhere */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.011em;
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Thin, unobtrusive scrollbars */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
