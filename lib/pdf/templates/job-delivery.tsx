@@ -3,13 +3,13 @@ import { BasePage, Signature, COLORS } from "@/lib/pdf/letterhead";
 import { formatDocDate, formatDateTime } from "@/lib/utils/dates";
 import type { JobDelivery, CompanySettings } from "@/lib/types";
 
+const PITCH = 15; // vertical spacing of the dotted ruled lines
 const b = { fontFamily: "Calibri", fontWeight: "bold" } as const;
 
 const s = StyleSheet.create({
   head: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   leftCol: { flex: 1, fontSize: 12, paddingTop: 22 },
   rightCol: { width: 190 },
-  poNo: { fontSize: 12, marginBottom: 4 },
   box: { borderWidth: 1, borderColor: COLORS.line },
   boxRow: { flexDirection: "row" },
   boxLabel: {
@@ -22,20 +22,20 @@ const s = StyleSheet.create({
   },
   boxValue: { flex: 1, padding: 4, fontSize: 13 },
   tin: { textAlign: "right", marginTop: 6, fontSize: 12 },
+
   titleWrap: {
     alignSelf: "center",
     borderWidth: 1.4,
     borderColor: COLORS.line,
     borderRadius: 22,
-    paddingVertical: 5,
+    paddingVertical: 4,
     paddingHorizontal: 26,
-    marginTop: 12,
-    marginBottom: 12,
+    marginTop: 10,
+    marginBottom: 10,
   },
   title: { fontSize: 19, fontFamily: "Calibri", fontWeight: "bold", textAlign: "center" },
 
-  fieldRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 9, fontSize: 12 },
-  contRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 6 },
+  // A dotted leader used inline (single line).
   leader: {
     flex: 1,
     borderBottomWidth: 1,
@@ -45,24 +45,40 @@ const s = StyleSheet.create({
     paddingBottom: 1,
     fontSize: 12,
   },
+  ruleLine: {
+    height: PITCH,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.faint,
+    borderStyle: "dashed",
+  },
   phrase: { fontSize: 12, paddingHorizontal: 4 },
-  handoverRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 9, fontSize: 12 },
-  handoverLabel: { width: 190, fontSize: 12 },
+
+  handoverRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 7 },
+  handoverLabel: { width: 195, fontSize: 12 },
 });
 
-/** A labelled field: value left-aligned on a dotted leader, plus `extra` empty dotted lines. */
-function Field({ label, value, extra = 0 }: { label: string; value?: string | null; extra?: number }) {
+/** Fixed dotted rules stacked behind wrapping text (ruled-paper effect). */
+function Rules({ count }: { count: number }) {
   return (
-    <View>
-      <View style={s.fieldRow}>
-        <Text>{label}</Text>
-        <Text style={s.leader}>{value ?? ""}</Text>
-      </View>
-      {Array.from({ length: extra }).map((_, i) => (
-        <View key={i} style={s.contRow}>
-          <Text style={s.leader}> </Text>
-        </View>
+    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <View key={i} style={s.ruleLine} />
       ))}
+    </View>
+  );
+}
+
+/** Run-in label + value that wraps across `lines` dotted rules. */
+function Field({ label, value, lines }: { label: string; value?: string | null; lines: number }) {
+  return (
+    <View style={{ marginTop: 8 }}>
+      <View style={{ position: "relative", height: lines * PITCH }}>
+        <Rules count={lines} />
+        <Text style={{ fontSize: 12, lineHeight: PITCH / 12 }}>
+          <Text style={b}>{label}</Text>
+          {value ?? ""}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -75,7 +91,7 @@ export function JobDeliveryPdf({
   company: CompanySettings | null;
 }) {
   const tin = company?.tin ?? "20724729-001";
-  const addressLines = (doc.customer_address ?? "").split("\n");
+  const addressLines = (doc.customer_address ?? "").split("\n").filter(Boolean);
 
   return (
     <Document title={`Job Delivery ${doc.jd_no}`} author="Bade Automobile Ltd">
@@ -88,7 +104,7 @@ export function JobDeliveryPdf({
               <Text style={s.leader}>{doc.customer_name}</Text>
             </View>
             {addressLines.map((l, i) => (
-              <View key={i} style={s.contRow}>
+              <View key={i} style={{ flexDirection: "row", marginTop: 6 }}>
                 <Text style={s.leader}>{l}</Text>
               </View>
             ))}
@@ -120,25 +136,23 @@ export function JobDeliveryPdf({
           <Text style={s.title}>JOB DELIVERY REPORT</Text>
         </View>
 
-        {/* Work description: <work> ...has been carried out on... <vehicle> */}
+        {/* Work description: <work> …has been carried out on… <vehicle> */}
         <Text style={{ fontSize: 12 }}>Work Description:</Text>
-        <View style={[s.fieldRow, { marginTop: 4 }]}>
+        <View style={{ flexDirection: "row", alignItems: "flex-end", marginTop: 4 }}>
           <Text style={[s.leader, { textAlign: "center", marginLeft: 0 }]}>{doc.work_done ?? ""}</Text>
           <Text style={s.phrase}>has been carried out on</Text>
           <Text style={[s.leader, { textAlign: "center", marginLeft: 0 }]}>{doc.vehicle ?? ""}</Text>
         </View>
-        <View style={s.contRow}>
-          <Text style={s.leader}> </Text>
-        </View>
+        <View style={[s.ruleLine, { marginTop: 2 }]} />
 
-        <Field label="Items Changed: " value={doc.items_changed} extra={1} />
-        <Field label="Note: " value={doc.note} />
-        <Field label="Next Service: " value={doc.next_service} />
-        <Field label="Accessories Found on Vehicle: " value={doc.accessories_found} extra={2} />
-        <Field label="Accessories Returned with Vehicle: " value={doc.accessories_returned} extra={2} />
+        <Field label="Items Changed: " value={doc.items_changed} lines={3} />
+        <Field label="Note: " value={doc.note} lines={1} />
+        <Field label="Next Service: " value={doc.next_service} lines={1} />
+        <Field label="Accessories Found on Vehicle: " value={doc.accessories_found} lines={3} />
+        <Field label="Accessories Returned with Vehicle: " value={doc.accessories_returned} lines={3} />
 
         {/* Handover block — values centered on their lines */}
-        <View style={{ marginTop: 16 }}>
+        <View style={{ marginTop: 12 }}>
           {[
             { label: "Date In and Time:", value: doc.date_in ? formatDateTime(doc.date_in) : "" },
             { label: "Date Out and Time:", value: doc.date_out ? formatDateTime(doc.date_out) : "" },
