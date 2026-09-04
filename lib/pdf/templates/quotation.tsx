@@ -9,11 +9,14 @@ const MIN_ROWS = 18;
 // Column widths as flex-basis percentages (from measured template geometry).
 const COL = { sn: "8%", desc: "46%", qty: "11%", rate: "17.5%", amount: "17.5%" } as const;
 
+const bold = { fontFamily: "Calibri", fontWeight: "bold" } as const;
+
 const s = StyleSheet.create({
   headerRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 2 },
-  ref: { fontSize: 13 },
-  date: { fontSize: 13 },
-  customer: { fontSize: 13, marginTop: 8 },
+  ref: { fontSize: 13, ...bold },
+  date: { fontSize: 13, ...bold },
+  customer: { fontSize: 13, marginTop: 8, ...bold },
+  custAddr: { fontSize: 13, ...bold },
   table: { marginTop: 14, borderTopWidth: 1, borderLeftWidth: 1, borderColor: COLORS.line },
   row: { flexDirection: "row" },
   cell: {
@@ -31,7 +34,8 @@ const s = StyleSheet.create({
     borderRightWidth: 1,
     borderBottomWidth: 1,
     borderColor: COLORS.line,
-    paddingVertical: 1.5,
+    backgroundColor: "#D9DEE7",
+    paddingVertical: 2,
     paddingHorizontal: 6,
     fontFamily: "Calibri",
     fontWeight: "bold",
@@ -64,7 +68,7 @@ export function QuotationPdf({ doc }: { doc: QuotationWithItems }) {
         <Text style={s.customer}>{doc.customer_name}</Text>
         {doc.customer_address
           ? doc.customer_address.split("\n").map((l, i) => (
-              <Text key={i} style={{ fontSize: 13 }}>{l}</Text>
+              <Text key={i} style={s.custAddr}>{l}</Text>
             ))
           : null}
 
@@ -74,8 +78,8 @@ export function QuotationPdf({ doc }: { doc: QuotationWithItems }) {
             <Cell w={COL.sn} style={s.th}>S/N</Cell>
             <Cell w={COL.desc} style={s.th}>DESCRIPTION</Cell>
             <Cell w={COL.qty} style={s.th}>QTY</Cell>
-            <View style={[s.cell, { width: COL.rate }]}><Text style={s.th}>{`RATE\n₦`}</Text></View>
-            <View style={[s.cell, { width: COL.amount }]}><Text style={s.th}>{`AMOUNT\n₦`}</Text></View>
+            <Cell w={COL.rate} style={s.th}>RATE (₦)</Cell>
+            <Cell w={COL.amount} style={s.th}>AMOUNT (₦)</Cell>
           </View>
 
           {/* Job title banner */}
