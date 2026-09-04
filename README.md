@@ -75,3 +75,14 @@ npm run build && npm run start   # production
 - Fonts: **Carlito** (OFL, metric-compatible with Calibri) in `public/fonts/`, so PDF text
   matches the templates. Letterhead/signature assets are in `public/brand/`.
 - This is Next.js **16** — middleware is `proxy.ts`; `params`/`searchParams` are async.
+
+
+
+
+
+
+git add .
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/EzRa021/badeautomobile.git
+git push -u origin main
