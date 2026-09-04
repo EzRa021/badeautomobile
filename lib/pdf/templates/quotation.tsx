@@ -67,12 +67,26 @@ export function QuotationPdf({ doc }: { doc: QuotationWithItems }) {
         </View>
         <Text style={s.customer}>{doc.customer_name}</Text>
         {doc.customer_address
-          ? doc.customer_address.split("\n").map((l, i) => (
-              <Text key={i} style={s.custAddr}>{l}</Text>
-            ))
+          ? doc.customer_address
+              .split("\n")
+              .filter(
+                (l) =>
+                  l.trim() &&
+                  l.trim().toUpperCase() !== doc.customer_name.trim().toUpperCase(),
+              )
+              .map((l, i) => (
+                <Text key={i} style={s.custAddr}>{l}</Text>
+              ))
           : null}
 
         <View style={s.table}>
+          {/* Job title banner comes first */}
+          {doc.job_title ? (
+            <View style={s.row}>
+              <Text style={s.banner}>{doc.job_title.toUpperCase()}</Text>
+            </View>
+          ) : null}
+
           {/* Header */}
           <View style={s.row}>
             <Cell w={COL.sn} style={s.th}>S/N</Cell>
@@ -81,13 +95,6 @@ export function QuotationPdf({ doc }: { doc: QuotationWithItems }) {
             <Cell w={COL.rate} style={s.th}>RATE (₦)</Cell>
             <Cell w={COL.amount} style={s.th}>AMOUNT (₦)</Cell>
           </View>
-
-          {/* Job title banner */}
-          {doc.job_title ? (
-            <View style={s.row}>
-              <Text style={s.banner}>{doc.job_title.toUpperCase()}</Text>
-            </View>
-          ) : null}
 
           {/* Items */}
           {doc.items.map((it, i) => (
