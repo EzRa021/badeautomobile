@@ -97,6 +97,9 @@ export function JobDeliveryForm({
               <option value="completed">Completed</option>
             </NativeSelect>
           </FormField>
+          <FormField label="GRN" htmlFor="grn_no" hint="Goods received note ref" className="sm:col-span-1">
+            <Input id="grn_no" name="grn_no" defaultValue={record?.grn_no ?? ""} className="font-mono" />
+          </FormField>
           <FormField label="P.O No" htmlFor="po_no" hint="Customer's PO ref" className="sm:col-span-1">
             <Input id="po_no" name="po_no" defaultValue={record?.po_no ?? ""} className="font-mono" />
           </FormField>

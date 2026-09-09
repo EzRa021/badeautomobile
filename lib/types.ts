@@ -162,6 +162,7 @@ export interface JobDelivery {
   id: string;
   jd_no: string;
   delivery_date: string;
+  grn_no: string | null;
   po_no: string | null;
   customer_id: string | null;
   customer_name: string;

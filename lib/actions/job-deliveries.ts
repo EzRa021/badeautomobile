@@ -17,6 +17,7 @@ export async function saveJobDelivery(
   const parsed = jobDeliverySchema.safeParse({
     jd_no: formData.get("jd_no"),
     delivery_date: formData.get("delivery_date"),
+    grn_no: formData.get("grn_no"),
     po_no: formData.get("po_no"),
     customer_id: formData.get("customer_id"),
     customer_name: formData.get("customer_name"),

@@ -304,6 +304,7 @@ create table if not exists public.job_deliveries (
   id                    uuid primary key default gen_random_uuid(),
   jd_no                 text not null unique,     -- shown as "Invoice No" on the template
   delivery_date         date not null default current_date,
+  grn_no                text,                     -- goods received note reference
   po_no                 text,                     -- customer's PO reference
   customer_id           uuid references public.customers(id) on delete set null,
   customer_name         text not null,

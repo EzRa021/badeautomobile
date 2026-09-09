@@ -1,7 +1,8 @@
 # Database (Supabase / Postgres)
 
-Full DDL: `supabase/migrations/0001_initial_schema.sql`. Apply it in the Supabase SQL
-editor or with `supabase db push`. This file is the human-readable summary.
+Full DDL: `supabase/migrations/0001_initial_schema.sql`, followed by the numbered
+migrations alongside it. Apply them in order in the Supabase SQL editor, or with
+`supabase db push`. This file is the human-readable summary.
 
 ## Tables
 | Table | Purpose | Key columns |
@@ -14,7 +15,7 @@ editor or with `supabase db push`. This file is the human-readable summary.
 | `quotations` / `quotation_items` | Quotation + lines | ref_no, quote_date, job_title, subtotal, total, status |
 | `invoices` / `invoice_items` | Invoice + per-line VAT | invoice_no, po_no, vat_rate, subtotal, vat_total, total, status |
 | `purchase_orders` / `purchase_order_items` | PO (Bade→supplier) + lines | po_no, supplier, subtotal, vat_total, total, status |
-| `job_deliveries` | Job delivery report (form) | jd_no, po_no, work_done, vehicle, items_changed, accessories_*, date_in/out |
+| `job_deliveries` | Job delivery report (form) | jd_no, grn_no, po_no, work_done, vehicle, items_changed, accessories_*, date_in/out |
 
 ## Conventions
 - PKs are `uuid default gen_random_uuid()`. Every table has `created_at`, `updated_at`

@@ -26,7 +26,7 @@ npm install
 
 ### 2. Create a Supabase project
 Create a project at [supabase.com](https://supabase.com), then open **SQL Editor** and run
-the migration in [`supabase/migrations/0001_initial_schema.sql`](supabase/migrations/0001_initial_schema.sql).
+the migrations in [`supabase/migrations/`](supabase/migrations) in filename order.
 It creates all tables, the numbering helpers, and row-level security.
 
 ### 3. Configure environment

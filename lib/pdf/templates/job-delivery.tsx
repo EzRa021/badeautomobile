@@ -4,12 +4,16 @@ import { formatDocDate, formatDateTime } from "@/lib/utils/dates";
 import type { JobDelivery, CompanySettings } from "@/lib/types";
 
 const PITCH = 15; // vertical spacing of the dotted ruled lines
+const REF_ROW = 21.6; // height of one "GRN:" / "PO No:" reference row incl. margin
 const b = { fontFamily: "Calibri", fontWeight: "bold" } as const;
 
 const s = StyleSheet.create({
   head: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-  leftCol: { flex: 1, fontSize: 12, paddingTop: 22 },
+  // Push the TO: block down so it stays level with the boxed Invoice No /
+  // Date panel, which now sits below two reference rows (GRN, then PO No).
+  leftCol: { flex: 1, fontSize: 12, paddingTop: 22 + REF_ROW },
   rightCol: { width: 190 },
+  refRow: { flexDirection: "row", alignItems: "flex-end", marginBottom: 4 },
   box: { borderWidth: 1, borderColor: COLORS.line },
   boxRow: { flexDirection: "row" },
   boxLabel: {
@@ -110,7 +114,11 @@ export function JobDeliveryPdf({
             ))}
           </View>
           <View style={s.rightCol}>
-            <View style={{ flexDirection: "row", alignItems: "flex-end", marginBottom: 4 }}>
+            <View style={s.refRow}>
+              <Text style={{ fontSize: 12 }}>GRN: </Text>
+              <Text style={s.leader}>{doc.grn_no ?? ""}</Text>
+            </View>
+            <View style={s.refRow}>
               <Text style={{ fontSize: 12 }}>PO No: </Text>
               <Text style={s.leader}>{doc.po_no ?? ""}</Text>
             </View>

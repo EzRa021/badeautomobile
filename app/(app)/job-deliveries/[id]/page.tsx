@@ -78,6 +78,7 @@ export default async function JobDeliveryDetailPage({
               <Field label="Customer" value={jd.customer_name} />
               <Field label="Address" value={jd.customer_address} />
               <Field label="Vehicle" value={jd.vehicle} />
+              <Field label="GRN" value={jd.grn_no} />
               <Field label="P.O No" value={jd.po_no} />
             </CardContent>
           </Card>
