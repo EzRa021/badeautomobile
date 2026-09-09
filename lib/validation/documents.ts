@@ -96,6 +96,7 @@ export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;
 export const jobDeliverySchema = z.object({
   jd_no: zRequiredText("Document number"),
   delivery_date: zDate,
+  grn_no: zOptText,
   po_no: zOptText,
   customer_id: uuidNullable,
   customer_name: zRequiredText("Customer"),

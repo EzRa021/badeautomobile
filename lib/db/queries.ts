@@ -156,7 +156,7 @@ export async function getPurchaseOrder(id: string): Promise<PurchaseOrderWithIte
 export async function listJobDeliveries(opts: { q?: string; status?: string } = {}): Promise<JobDelivery[]> {
   const supabase = await createClient();
   let query = supabase.from("job_deliveries").select("*").order("delivery_date", { ascending: false });
-  if (opts.q) query = query.or(`jd_no.ilike.%${opts.q}%,customer_name.ilike.%${opts.q}%,po_no.ilike.%${opts.q}%,vehicle.ilike.%${opts.q}%`);
+  if (opts.q) query = query.or(`jd_no.ilike.%${opts.q}%,customer_name.ilike.%${opts.q}%,grn_no.ilike.%${opts.q}%,po_no.ilike.%${opts.q}%,vehicle.ilike.%${opts.q}%`);
   if (opts.status) query = query.eq("status", opts.status);
   const { data } = await query;
   return (data as JobDelivery[]) ?? [];

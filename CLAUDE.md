@@ -45,7 +45,7 @@ npm run dev      # local dev
 npm run build    # production build (must stay clean)
 npm run lint
 ```
-Supabase: apply `supabase/migrations/0001_initial_schema.sql`, set `.env.local`
+Supabase: apply the migrations in `supabase/migrations/` in order, set `.env.local`
 (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`), create the first user in the
 Supabase dashboard, then log in at `/login`.
 

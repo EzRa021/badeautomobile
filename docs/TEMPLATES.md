@@ -38,11 +38,12 @@ the **TOTAL** row pinned near the bottom (y≈554).
 
 ## 2. Job Delivery Report (`JOB DELIVERY.pdf`)
 
-A form, not a table. Header: `PO No`, a boxed `Invoice No` / `Date` (top right),
+A form, not a table. Header: `GRN` and `PO No`, a boxed `Invoice No` / `Date` (top right),
 `TIN NO`, then the centered title **JOB DELIVERY REPORT** (22 pt bold), then labelled
 fields with dotted leaders.
 
 **Fields**
+- `GRN` (goods received note ref) — printed directly above `PO No`
 - `PO No` (customer PO ref, e.g. `4563673136`)
 - `TO:` customer name + up to 3 address lines
 - `Invoice No` (e.g. `000159`) and `Date` (e.g. `13/08/2026`) in the top‑right box
