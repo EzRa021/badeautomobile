@@ -63,7 +63,42 @@ Build order. Each phase leaves the app in a runnable state.
 - [ ] Render each document type; compare to `/templates`
 - [ ] Manual pass: auth guard, CRUD, search/filter, PDF download/print
 
+## Phase 10 — Fairmarkit RFQ round-trip
+- [x] `lib/xlsx/` — minimal OOXML reader/writer on `fflate` (no SheetJS)
+- [x] `lib/fairmarkit/` — schema + parse + build; `quotations.fairmarkit` jsonb snapshot
+      (migration `0003_quotation_fairmarkit.sql`)
+- [x] `POST /api/import/fairmarkit` + import button on the quotation form
+      (fills description / qty / UOM; prices stay blank)
+- [x] `GET /api/quotations/[id]/fairmarkit` + download button on the quotation page
+      (buyer columns replayed, supplier columns NIL / priced)
+- [x] Works for quotations never imported from Fairmarkit (sheet is synthesised)
+
+## Phase 11 — Vehicle service history
+- [x] `vehicle_id` + printed snapshot on all four document types
+      (migration `0004_vehicle_history.sql`, with backfill from existing free text)
+- [x] Shared `VehiclePicker`; typed vehicles are registered on save via `resolveVehicle()`
+      (plate-normalised match, then description, then create)
+- [x] Vehicle picked automatically from a Fairmarkit RFQ title (`extractVehicleFromTitle`)
+- [x] `/vehicles/[id]` history: stat cards, date-range + type filters, merged document
+      timeline, monthly revenue, `invoiced − parts`
+- [x] "Vehicle" link on every document detail page; `?vehicle=` prefill when raising one
+
+## Phase 12 — List pages
+- [x] `lib/db/list.ts` + `pagedList()`: allowlisted sorting, escaped search, validated
+      dates, stable paging, self-correcting out-of-range pages
+- [x] `DataTable` (server component) with sortable headers, `hideBelow` columns and a
+      card layout on phones; `Pagination` with page size; `SortHeader`; `StatusToggle`
+- [x] Quotations, Invoices, Purchase Orders, Job Deliveries, Customers, Suppliers,
+      Vehicles and the vehicle history all on the table
+- [x] Inline status changes from the table (optimistic, via `useOptimistic`)
+
 ## Notes / decisions
 - Third document = **Invoice (from template) + Purchase Order (new, same letterhead)** — per user.
 - Auth: **email/password** (Supabase). No public sign-up.
 - Keep every document's contact + totals **snapshotted** for stable reprints.
+- Fairmarkit only accepts the sheet it issued, so the whole source sheet (buyer columns
+  included) is snapshotted on the quotation rather than re-derived. See `docs/FAIRMARKIT.md`.
+- Vehicles are captured by typing, not by pre-registering: history is only useful if it is
+  complete, so a typed vehicle is matched or created on save. See `docs/VEHICLES.md`.
+- List state lives in the URL, never in client state, so a filtered/sorted view is
+  server-rendered and shareable. See `docs/LISTS.md`.

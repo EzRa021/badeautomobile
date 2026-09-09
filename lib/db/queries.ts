@@ -1,4 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
+import {
+  escapeLike,
+  resolvePaging,
+  resolveSort,
+  toPaged,
+  type ListOptions,
+  type Paged,
+  type SortMap,
+} from "./list";
 import type {
   CompanySettings,
   Customer,
@@ -25,6 +34,59 @@ export async function getCompanySettings(): Promise<CompanySettings | null> {
   return data as CompanySettings | null;
 }
 
+
+// ------------------------------------------------------------- List plumbing
+/**
+ * Shape a list query the same way everywhere: search, status, an inclusive date
+ * range on the table's own date column, an allowlisted sort with a stable
+ * tiebreaker, and a counted page.
+ */
+async function pagedList<T>(
+  table: string,
+  opts: ListOptions,
+  config: {
+    /** Columns the free-text search covers. */
+    search: string[];
+    /** Column the `from`/`to` range applies to. */
+    dateColumn: string;
+    sorts: SortMap;
+    defaultSort: string;
+    select?: string;
+  },
+): Promise<Paged<T>> {
+  const supabase = await createClient();
+  const sort = resolveSort(config.sorts, config.defaultSort, opts.sort, opts.dir);
+  const paging = resolvePaging(opts);
+
+  let query = supabase.from(table).select(config.select ?? "*", { count: "exact" });
+
+  const term = opts.q ? escapeLike(opts.q) : "";
+  if (term) {
+    query = query.or(config.search.map((column) => `${column}.ilike.%${term}%`).join(","));
+  }
+  if (opts.status) query = query.eq("status", opts.status);
+  if (opts.from) query = query.gte(config.dateColumn, opts.from);
+  if (opts.to) query = query.lte(config.dateColumn, opts.to);
+
+  const ordered = query
+    .order(sort.column, { ascending: sort.ascending })
+    // Keeps paging stable when many rows share the sorted value.
+    .order("id", { ascending: true });
+
+  const { data, count } = await ordered.range(paging.offset, paging.limit);
+  const result = toPaged((data as T[]) ?? [], count ?? null, paging);
+
+  // A hand-edited `?page=` (or rows deleted since the link was made) can land
+  // past the end. Fetch the clamped page so the table and pager agree.
+  if (result.rows.length === 0 && result.total > 0 && paging.page > result.page) {
+    const clamped = resolvePaging({ ...opts, page: result.page });
+    const { data: retry } = await ordered.range(clamped.offset, clamped.limit);
+    return toPaged((retry as T[]) ?? [], count ?? null, clamped);
+  }
+
+  return result;
+}
+
 // ------------------------------------------------------------------ Customers
 export async function listCustomers(q?: string): Promise<Customer[]> {
   const supabase = await createClient();
@@ -32,6 +94,24 @@ export async function listCustomers(q?: string): Promise<Customer[]> {
   if (q) query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,tin.ilike.%${q}%`);
   const { data } = await query;
   return (data as Customer[]) ?? [];
+}
+
+export const CONTACT_SORTS: SortMap = {
+  name: "asc",
+  phone: "asc",
+  email: "asc",
+  tin: "asc",
+  created_at: "desc",
+};
+
+/** Paged view for the customers list page (the unpaged `listCustomers` feeds form pickers). */
+export function pagedCustomers(opts: ListOptions = {}): Promise<Paged<Customer>> {
+  return pagedList<Customer>("customers", opts, {
+    search: ["name", "phone", "email", "tin"],
+    dateColumn: "created_at",
+    sorts: CONTACT_SORTS,
+    defaultSort: "name",
+  });
 }
 
 export async function getCustomer(id: string): Promise<Customer | null> {
@@ -47,6 +127,16 @@ export async function listSuppliers(q?: string): Promise<Supplier[]> {
   if (q) query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,tin.ilike.%${q}%`);
   const { data } = await query;
   return (data as Supplier[]) ?? [];
+}
+
+/** Paged view for the suppliers list page. */
+export function pagedSuppliers(opts: ListOptions = {}): Promise<Paged<Supplier>> {
+  return pagedList<Supplier>("suppliers", opts, {
+    search: ["name", "phone", "email", "tin"],
+    dateColumn: "created_at",
+    sorts: CONTACT_SORTS,
+    defaultSort: "name",
+  });
 }
 
 export async function getSupplier(id: string): Promise<Supplier | null> {
@@ -67,6 +157,40 @@ export async function listVehicles(q?: string): Promise<(Vehicle & { customer?: 
   return (data as (Vehicle & { customer?: { name: string } | null })[]) ?? [];
 }
 
+export type VehicleRow = Vehicle & { customer?: { name: string } | null };
+
+export const VEHICLE_SORTS: SortMap = {
+  description: "asc",
+  reg_no: "asc",
+  make: "asc",
+  model: "asc",
+  created_at: "desc",
+};
+
+/** Paged view for the vehicles list page. */
+export function pagedVehicles(opts: ListOptions = {}): Promise<Paged<VehicleRow>> {
+  return pagedList<VehicleRow>("vehicles", opts, {
+    search: ["description", "reg_no", "make", "model"],
+    dateColumn: "created_at",
+    sorts: VEHICLE_SORTS,
+    defaultSort: "description",
+    select: "*, customer:customers(name)",
+  });
+}
+
+export type VehicleWithOwner = Vehicle & { customer?: { id: string; name: string } | null };
+
+/** A single vehicle, with its owner joined for the history header. */
+export async function getVehicleWithOwner(id: string): Promise<VehicleWithOwner | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("vehicles")
+    .select("*, customer:customers(id, name)")
+    .eq("id", id)
+    .maybeSingle();
+  return (data as VehicleWithOwner) ?? null;
+}
+
 export async function getVehicle(id: string): Promise<Vehicle | null> {
   const supabase = await createClient();
   const { data } = await supabase.from("vehicles").select("*").eq("id", id).maybeSingle();
@@ -84,13 +208,22 @@ export async function vehiclesForCustomer(customerId: string): Promise<Vehicle[]
 }
 
 // ----------------------------------------------------------------- Quotations
-export async function listQuotations(opts: { q?: string; status?: string } = {}): Promise<Quotation[]> {
-  const supabase = await createClient();
-  let query = supabase.from("quotations").select("*").order("quote_date", { ascending: false });
-  if (opts.q) query = query.or(`ref_no.ilike.%${opts.q}%,customer_name.ilike.%${opts.q}%,job_title.ilike.%${opts.q}%`);
-  if (opts.status) query = query.eq("status", opts.status);
-  const { data } = await query;
-  return (data as Quotation[]) ?? [];
+export const QUOTATION_SORTS: SortMap = {
+  ref_no: "asc",
+  quote_date: "desc",
+  customer_name: "asc",
+  vehicle_label: "asc",
+  total: "desc",
+  status: "asc",
+};
+
+export function listQuotations(opts: ListOptions = {}): Promise<Paged<Quotation>> {
+  return pagedList<Quotation>("quotations", opts, {
+    search: ["ref_no", "customer_name", "job_title", "vehicle_label"],
+    dateColumn: "quote_date",
+    sorts: QUOTATION_SORTS,
+    defaultSort: "quote_date",
+  });
 }
 
 export async function getQuotation(id: string): Promise<QuotationWithItems | null> {
@@ -107,13 +240,22 @@ export async function getQuotation(id: string): Promise<QuotationWithItems | nul
 }
 
 // ------------------------------------------------------------------- Invoices
-export async function listInvoices(opts: { q?: string; status?: string } = {}): Promise<Invoice[]> {
-  const supabase = await createClient();
-  let query = supabase.from("invoices").select("*").order("invoice_date", { ascending: false });
-  if (opts.q) query = query.or(`invoice_no.ilike.%${opts.q}%,customer_name.ilike.%${opts.q}%,po_no.ilike.%${opts.q}%`);
-  if (opts.status) query = query.eq("status", opts.status);
-  const { data } = await query;
-  return (data as Invoice[]) ?? [];
+export const INVOICE_SORTS: SortMap = {
+  invoice_no: "asc",
+  invoice_date: "desc",
+  customer_name: "asc",
+  po_no: "asc",
+  total: "desc",
+  status: "asc",
+};
+
+export function listInvoices(opts: ListOptions = {}): Promise<Paged<Invoice>> {
+  return pagedList<Invoice>("invoices", opts, {
+    search: ["invoice_no", "customer_name", "po_no", "vehicle_label"],
+    dateColumn: "invoice_date",
+    sorts: INVOICE_SORTS,
+    defaultSort: "invoice_date",
+  });
 }
 
 export async function getInvoice(id: string): Promise<InvoiceWithItems | null> {
@@ -130,13 +272,23 @@ export async function getInvoice(id: string): Promise<InvoiceWithItems | null> {
 }
 
 // ------------------------------------------------------------- Purchase Orders
-export async function listPurchaseOrders(opts: { q?: string; status?: string } = {}): Promise<PurchaseOrder[]> {
-  const supabase = await createClient();
-  let query = supabase.from("purchase_orders").select("*").order("po_date", { ascending: false });
-  if (opts.q) query = query.or(`po_no.ilike.%${opts.q}%,supplier_name.ilike.%${opts.q}%,vehicle_ref.ilike.%${opts.q}%`);
-  if (opts.status) query = query.eq("status", opts.status);
-  const { data } = await query;
-  return (data as PurchaseOrder[]) ?? [];
+export const PURCHASE_ORDER_SORTS: SortMap = {
+  po_no: "asc",
+  po_date: "desc",
+  supplier_name: "asc",
+  vehicle_ref: "asc",
+  total: "desc",
+  status: "asc",
+  expected_date: "desc",
+};
+
+export function listPurchaseOrders(opts: ListOptions = {}): Promise<Paged<PurchaseOrder>> {
+  return pagedList<PurchaseOrder>("purchase_orders", opts, {
+    search: ["po_no", "supplier_name", "vehicle_ref"],
+    dateColumn: "po_date",
+    sorts: PURCHASE_ORDER_SORTS,
+    defaultSort: "po_date",
+  });
 }
 
 export async function getPurchaseOrder(id: string): Promise<PurchaseOrderWithItems | null> {
@@ -153,13 +305,22 @@ export async function getPurchaseOrder(id: string): Promise<PurchaseOrderWithIte
 }
 
 // ------------------------------------------------------------- Job Deliveries
-export async function listJobDeliveries(opts: { q?: string; status?: string } = {}): Promise<JobDelivery[]> {
-  const supabase = await createClient();
-  let query = supabase.from("job_deliveries").select("*").order("delivery_date", { ascending: false });
-  if (opts.q) query = query.or(`jd_no.ilike.%${opts.q}%,customer_name.ilike.%${opts.q}%,grn_no.ilike.%${opts.q}%,po_no.ilike.%${opts.q}%,vehicle.ilike.%${opts.q}%`);
-  if (opts.status) query = query.eq("status", opts.status);
-  const { data } = await query;
-  return (data as JobDelivery[]) ?? [];
+export const JOB_DELIVERY_SORTS: SortMap = {
+  jd_no: "asc",
+  delivery_date: "desc",
+  customer_name: "asc",
+  vehicle: "asc",
+  grn_no: "asc",
+  status: "asc",
+};
+
+export function listJobDeliveries(opts: ListOptions = {}): Promise<Paged<JobDelivery>> {
+  return pagedList<JobDelivery>("job_deliveries", opts, {
+    search: ["jd_no", "customer_name", "grn_no", "po_no", "vehicle"],
+    dateColumn: "delivery_date",
+    sorts: JOB_DELIVERY_SORTS,
+    defaultSort: "delivery_date",
+  });
 }
 
 export async function getJobDelivery(id: string): Promise<JobDelivery | null> {

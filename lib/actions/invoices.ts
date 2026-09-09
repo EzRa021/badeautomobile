@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient, requireUser } from "@/lib/supabase/server";
 import { invoiceSchema } from "@/lib/validation/documents";
 import { bumpDocumentCounter } from "@/lib/db/numbering";
+import { resolveVehicle } from "@/lib/db/vehicles";
 import { amountToWords } from "@/lib/utils/number-to-words";
 import { round2 } from "@/lib/utils/money";
 import type { ActionState } from "@/lib/validation/shared";
@@ -33,6 +34,9 @@ export async function saveInvoice(
     customer_address: formData.get("customer_address"),
     customer_number: formData.get("customer_number"),
     po_no: formData.get("po_no"),
+    vehicle_id: formData.get("vehicle_id"),
+    vehicle_label: formData.get("vehicle_label"),
+    vehicle_reg_no: formData.get("vehicle_reg_no"),
     vat_rate: formData.get("vat_rate"),
     status: formData.get("status") || "unpaid",
     quotation_id: formData.get("quotation_id"),
@@ -46,6 +50,17 @@ export async function saveInvoice(
 
   const data = parsed.data;
   const rate = data.vat_rate;
+
+  // Register the vehicle (or link the existing one) so it gains a history.
+  const vehicle = await resolveVehicle(
+    {
+      id: data.vehicle_id,
+      label: data.vehicle_label,
+      reg_no: data.vehicle_reg_no,
+      customer_id: data.customer_id,
+    },
+    user.id,
+  );
 
   const computedItems = data.items.map((it, i) => {
     const net = round2(it.qty * it.unit_price);
@@ -77,6 +92,8 @@ export async function saveInvoice(
     customer_address: data.customer_address,
     customer_number: data.customer_number,
     po_no: data.po_no,
+    vehicle_id: vehicle.id,
+    vehicle_label: vehicle.label,
     vat_rate: rate,
     subtotal,
     vat_total,

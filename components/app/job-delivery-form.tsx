@@ -3,12 +3,13 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
-import type { JobDelivery, Vehicle } from "@/lib/types";
+import type { JobDelivery } from "@/lib/types";
 import type { ActionState } from "@/lib/validation/shared";
 import { saveJobDelivery } from "@/lib/actions/job-deliveries";
 import { useFormDraft } from "@/lib/hooks/use-form-draft";
 import { toDateTimeInputValue } from "@/lib/utils/dates";
 import { PartyPicker, type PartyOption, type PartyValue } from "@/components/app/party-picker";
+import { VehiclePicker, type VehicleOption, type VehicleValue } from "@/components/app/vehicle-picker";
 import { FormField } from "@/components/app/form-field";
 import { FormActionBar } from "@/components/app/form-action-bar";
 import { SubmitButton } from "@/components/app/submit-button";
@@ -17,8 +18,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-type VehicleOption = Pick<Vehicle, "id" | "description">;
 
 export function JobDeliveryForm({
   record,
@@ -43,8 +42,11 @@ export function JobDeliveryForm({
   };
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(saveJobDelivery, {});
-  const [vehicleId, setVehicleId] = useState(record?.vehicle_id ?? seed?.vehicle_id ?? "");
-  const [vehicleText, setVehicleText] = useState(record?.vehicle ?? seed?.vehicle ?? "");
+  const [vehicle, setVehicle] = useState<VehicleValue>({
+    id: record?.vehicle_id ?? seed?.vehicle_id ?? "",
+    label: record?.vehicle ?? seed?.vehicle ?? "",
+    reg_no: "",
+  });
   const [party, setParty] = useState<PartyValue>({
     id: record?.customer_id ?? seed?.customer_id ?? "",
     name: record?.customer_name ?? seed?.customer_name ?? "",
@@ -58,10 +60,13 @@ export function JobDeliveryForm({
     formRef,
     restore: (d) => {
       setParty({ id: d.customer_id ?? "", name: d.customer_name ?? "", address: d.customer_address ?? "" });
-      if (d.vehicle_id !== undefined) setVehicleId(d.vehicle_id);
-      if (d.vehicle !== undefined) setVehicleText(d.vehicle);
+      setVehicle({
+        id: d.vehicle_id ?? "",
+        label: d.vehicle ?? "",
+        reg_no: d.vehicle_reg_no ?? "",
+      });
     },
-    deps: [party, vehicleId, vehicleText],
+    deps: [party, vehicle],
   });
 
   useEffect(() => {
@@ -69,16 +74,9 @@ export function JobDeliveryForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  function onVehicleSelect(value: string) {
-    setVehicleId(value);
-    const v = vehicles.find((x) => x.id === value);
-    if (v) setVehicleText(v.description);
-  }
-
   return (
     <form ref={formRef} action={formAction} onSubmit={() => draft.clear()} className="space-y-5">
       {record && <input type="hidden" name="id" value={record.id} />}
-      <input type="hidden" name="vehicle_id" value={vehicleId} />
 
       <Card>
         <CardHeader>
@@ -121,21 +119,13 @@ export function JobDeliveryForm({
             onChange={setParty}
             errors={{ name: fe.customer_name?.[0] }}
           />
-          <div className="grid gap-5 sm:grid-cols-2">
-            <FormField label="Vehicle (registry)" htmlFor="vehicle_select" hint="Optional — fills the field below">
-              <NativeSelect id="vehicle_select" value={vehicleId} onChange={(e) => onVehicleSelect(e.target.value)}>
-                <option value="">— None —</option>
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.description}
-                  </option>
-                ))}
-              </NativeSelect>
-            </FormField>
-            <FormField label="Vehicle (printed)" htmlFor="vehicle">
-              <Input id="vehicle" name="vehicle" value={vehicleText} onChange={(e) => setVehicleText(e.target.value)} placeholder="Toyota Fortuner KSF 318 FJ" />
-            </FormField>
-          </div>
+          <VehiclePicker
+            options={vehicles}
+            value={vehicle}
+            onChange={setVehicle}
+            labelName="vehicle"
+            labelHint="Printed on the report"
+          />
         </CardContent>
       </Card>
 

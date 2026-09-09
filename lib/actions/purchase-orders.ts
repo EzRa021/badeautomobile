@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient, requireUser } from "@/lib/supabase/server";
 import { purchaseOrderSchema } from "@/lib/validation/documents";
 import { bumpDocumentCounter } from "@/lib/db/numbering";
+import { resolveVehicle } from "@/lib/db/vehicles";
 import { amountToWords } from "@/lib/utils/number-to-words";
 import { round2 } from "@/lib/utils/money";
 import type { ActionState } from "@/lib/validation/shared";
@@ -32,7 +33,9 @@ export async function savePurchaseOrder(
     supplier_name: formData.get("supplier_name"),
     supplier_address: formData.get("supplier_address"),
     deliver_to: formData.get("deliver_to"),
+    vehicle_id: formData.get("vehicle_id"),
     vehicle_ref: formData.get("vehicle_ref"),
+    vehicle_reg_no: formData.get("vehicle_reg_no"),
     vat_rate: formData.get("vat_rate"),
     expected_date: formData.get("expected_date"),
     status: formData.get("status") || "draft",
@@ -45,6 +48,13 @@ export async function savePurchaseOrder(
   }
 
   const data = parsed.data;
+
+  // `vehicle_ref` is what the PO prints; the link is what builds the history.
+  const vehicle = await resolveVehicle(
+    { id: data.vehicle_id, label: data.vehicle_ref, reg_no: data.vehicle_reg_no },
+    user.id,
+  );
+
   const subtotal = round2(data.items.reduce((s, it) => s + it.amount, 0));
   const vat_total = round2((subtotal * data.vat_rate) / 100);
   const total = round2(subtotal + vat_total);
@@ -57,7 +67,8 @@ export async function savePurchaseOrder(
     supplier_name: data.supplier_name,
     supplier_address: data.supplier_address,
     deliver_to: data.deliver_to,
-    vehicle_ref: data.vehicle_ref,
+    vehicle_id: vehicle.id,
+    vehicle_ref: vehicle.label ?? data.vehicle_ref,
     vat_rate: data.vat_rate,
     subtotal,
     vat_total,

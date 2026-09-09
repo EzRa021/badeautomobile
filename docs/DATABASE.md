@@ -12,7 +12,7 @@ migrations alongside it. Apply them in order in the Supabase SQL editor, or with
 | `customers` | Client registry (snapshotted onto docs) | name, address, tin, phone, email |
 | `suppliers` | Vendor registry (for POs) | name, address, tin, phone, email |
 | `vehicles` | Serviced-vehicle registry | customer_id, description, reg_no, make, model |
-| `quotations` / `quotation_items` | Quotation + lines | ref_no, quote_date, job_title, subtotal, total, status |
+| `quotations` / `quotation_items` | Quotation + lines | ref_no, quote_date, job_title, subtotal, total, status, fairmarkit |
 | `invoices` / `invoice_items` | Invoice + per-line VAT | invoice_no, po_no, vat_rate, subtotal, vat_total, total, status |
 | `purchase_orders` / `purchase_order_items` | PO (Bade→supplier) + lines | po_no, supplier, subtotal, vat_total, total, status |
 | `job_deliveries` | Job delivery report (form) | jd_no, grn_no, po_no, work_done, vehicle, items_changed, accessories_*, date_in/out |
@@ -24,6 +24,13 @@ migrations alongside it. Apply them in order in the Supabase SQL editor, or with
 - Parent documents store **computed snapshots** (subtotal/vat_total/total, amount_in_words)
   and **contact snapshots** (customer/supplier name + address) so printed documents are stable.
 - `status` columns use `text` + `CHECK` constraints (see DDL) rather than PG enums.
+- Every document links to a vehicle (`vehicle_id`) **and** snapshots what it prints:
+  `vehicle_label` on quotations/invoices, `vehicle_ref` on POs, `vehicle` on job
+  deliveries. `vehicles.reg_no_key` is a generated column (plate upper-cased, punctuation
+  stripped) used to match a typed plate to the registry. See `docs/VEHICLES.md`.
+- `quotations.fairmarkit` (`jsonb`, nullable) snapshots the source Fairmarkit RFQ sheet
+  when a quote was imported from one, so the bid workbook can be rebuilt on export.
+  Null for ordinary quotations. See `docs/FAIRMARKIT.md`.
 
 ## Numbering
 `select public.next_document_number('invoice');` → advances the counter and returns e.g.

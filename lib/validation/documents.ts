@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fairmarkitSourceField } from "@/lib/fairmarkit/schema";
 import {
   zMoney,
   zMoneyNullable,
@@ -34,11 +35,15 @@ export const quotationSchema = z.object({
   customer_name: zRequiredText("Customer"),
   customer_address: zOptText,
   vehicle_id: uuidNullable,
+  vehicle_label: zOptText,
+  vehicle_reg_no: zOptText,
   job_title: zOptText,
   status: z
     .enum(["draft", "sent", "accepted", "rejected", "invoiced"])
     .default("draft"),
   notes: zOptText,
+  /** Source RFQ sheet when the quote was imported from Fairmarkit. */
+  fairmarkit: fairmarkitSourceField.default(null),
   items: z.array(quotationItemSchema).min(1, "Add at least one item"),
 });
 export type QuotationInput = z.infer<typeof quotationSchema>;
@@ -59,6 +64,9 @@ export const invoiceSchema = z.object({
   customer_address: zOptText,
   customer_number: zOptText,
   po_no: zOptText,
+  vehicle_id: uuidNullable,
+  vehicle_label: zOptText,
+  vehicle_reg_no: zOptText,
   vat_rate: zMoney,
   status: z.enum(["unpaid", "partial", "paid", "cancelled"]).default("unpaid"),
   quotation_id: uuidNullable,
@@ -83,7 +91,9 @@ export const purchaseOrderSchema = z.object({
   supplier_name: zRequiredText("Supplier"),
   supplier_address: zOptText,
   deliver_to: zOptText,
+  vehicle_id: uuidNullable,
   vehicle_ref: zOptText,
+  vehicle_reg_no: zOptText,
   vat_rate: zMoney,
   expected_date: dateNullable,
   status: z.enum(["draft", "sent", "received", "cancelled"]).default("draft"),
@@ -104,6 +114,7 @@ export const jobDeliverySchema = z.object({
   vehicle_id: uuidNullable,
   work_done: zOptText,
   vehicle: zOptText,
+  vehicle_reg_no: zOptText,
   items_changed: zOptText,
   note: zOptText,
   next_service: zOptText,

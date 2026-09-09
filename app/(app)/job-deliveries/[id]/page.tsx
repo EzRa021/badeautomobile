@@ -7,6 +7,7 @@ import { deleteJobDelivery, setJobDeliveryStatus } from "@/lib/actions/job-deliv
 import { formatDisplayDate, formatDateTime } from "@/lib/utils/dates";
 import { PageHeader } from "@/components/app/page-header";
 import { ReferenceChip } from "@/components/app/reference-chip";
+import { VehicleLink } from "@/components/app/vehicle-link";
 import { StatusSelect } from "@/components/app/status-select";
 import { PdfButtons } from "@/components/app/pdf-buttons";
 import { ConfirmDelete } from "@/components/app/confirm-delete";
@@ -126,6 +127,14 @@ export default async function JobDeliveryDetailPage({
                   <dt className="text-muted-foreground">Created</dt>
                   <dd>{formatDisplayDate(jd.created_at)}</dd>
                 </div>
+                {(jd.vehicle_id || jd.vehicle) && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">Vehicle</dt>
+                    <dd className="text-right">
+                      <VehicleLink id={jd.vehicle_id} label={jd.vehicle} />
+                    </dd>
+                  </div>
+                )}
               </dl>
             </CardContent>
           </Card>

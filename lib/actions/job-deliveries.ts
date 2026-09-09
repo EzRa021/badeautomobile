@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient, requireUser } from "@/lib/supabase/server";
 import { jobDeliverySchema } from "@/lib/validation/documents";
 import { bumpDocumentCounter } from "@/lib/db/numbering";
+import { resolveVehicle } from "@/lib/db/vehicles";
 import type { ActionState } from "@/lib/validation/shared";
 
 export async function saveJobDelivery(
@@ -25,6 +26,7 @@ export async function saveJobDelivery(
     vehicle_id: formData.get("vehicle_id"),
     work_done: formData.get("work_done"),
     vehicle: formData.get("vehicle"),
+    vehicle_reg_no: formData.get("vehicle_reg_no"),
     items_changed: formData.get("items_changed"),
     note: formData.get("note"),
     next_service: formData.get("next_service"),
@@ -43,17 +45,36 @@ export async function saveJobDelivery(
     return { fieldErrors: fe.fieldErrors as Record<string, string[]>, error: fe.formErrors[0] };
   }
 
-  const data = parsed.data;
+  // `vehicle_reg_no` feeds the registry lookup; it is not a column on this table.
+  const { vehicle_reg_no, ...data } = parsed.data;
+
+  // Register the vehicle (or link the existing one) so it gains a history.
+  const vehicle = await resolveVehicle(
+    {
+      id: data.vehicle_id,
+      label: data.vehicle,
+      reg_no: vehicle_reg_no,
+      customer_id: data.customer_id,
+    },
+    user.id,
+  );
+
+  const parent = {
+    ...data,
+    vehicle_id: vehicle.id,
+    vehicle: vehicle.label ?? data.vehicle,
+  };
+
   const supabase = await createClient();
   let jdId = id;
 
   if (id) {
-    const { error } = await supabase.from("job_deliveries").update(data).eq("id", id);
+    const { error } = await supabase.from("job_deliveries").update(parent).eq("id", id);
     if (error) return { error: mapDbError(error.message) };
   } else {
     const { data: created, error } = await supabase
       .from("job_deliveries")
-      .insert({ ...data, created_by: user.id })
+      .insert({ ...parent, created_by: user.id })
       .select("id")
       .single();
     if (error || !created) return { error: mapDbError(error?.message) };

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/app/page-header";
 import { PurchaseOrderForm } from "@/components/app/purchase-order-form";
-import { getPurchaseOrder, listSuppliers } from "@/lib/db/queries";
+import { getPurchaseOrder, listSuppliers, listVehicles } from "@/lib/db/queries";
 import { toDateInputValue } from "@/lib/utils/dates";
 
 export const metadata: Metadata = { title: "Edit purchase order" };
@@ -13,7 +13,11 @@ export default async function EditPurchaseOrderPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [po, suppliers] = await Promise.all([getPurchaseOrder(id), listSuppliers()]);
+  const [po, suppliers, vehicles] = await Promise.all([
+    getPurchaseOrder(id),
+    listSuppliers(),
+    listVehicles(),
+  ]);
   if (!po) notFound();
 
   return (
@@ -26,7 +30,13 @@ export default async function EditPurchaseOrderPage({
           { label: "Edit" },
         ]}
       />
-      <PurchaseOrderForm record={po} suppliers={suppliers} defaultNo={po.po_no} defaultDate={toDateInputValue(po.po_date)} />
+      <PurchaseOrderForm
+        record={po}
+        suppliers={suppliers}
+        vehicles={vehicles}
+        defaultNo={po.po_no}
+        defaultDate={toDateInputValue(po.po_date)}
+      />
     </div>
   );
 }

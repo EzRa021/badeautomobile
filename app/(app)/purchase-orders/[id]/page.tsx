@@ -8,6 +8,7 @@ import { formatDisplayDate } from "@/lib/utils/dates";
 import { formatNaira, formatAmount } from "@/lib/utils/money";
 import { PageHeader } from "@/components/app/page-header";
 import { ReferenceChip } from "@/components/app/reference-chip";
+import { VehicleLink } from "@/components/app/vehicle-link";
 import { StatusSelect } from "@/components/app/status-select";
 import { PdfButtons } from "@/components/app/pdf-buttons";
 import { ConfirmDelete } from "@/components/app/confirm-delete";
@@ -150,10 +151,12 @@ export default async function PurchaseOrderDetailPage({
             <CardContent className="space-y-4">
               <StatusSelect action={setPurchaseOrderStatus} id={po.id} current={po.status} options={STATUS_OPTIONS} />
               <dl className="space-y-2 text-sm">
-                {po.vehicle_ref && (
-                  <div className="flex justify-between">
+                {(po.vehicle_id || po.vehicle_ref) && (
+                  <div className="flex justify-between gap-3">
                     <dt className="text-muted-foreground">Vehicle / job</dt>
-                    <dd className="text-right">{po.vehicle_ref}</dd>
+                    <dd className="text-right">
+                      <VehicleLink id={po.vehicle_id} label={po.vehicle_ref} />
+                    </dd>
                   </div>
                 )}
                 <div className="flex justify-between">

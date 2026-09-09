@@ -40,16 +40,24 @@ app/
     settings/
   api/
     quotations/[id]/pdf/route.ts
+    quotations/[id]/fairmarkit/route.ts   # export the Fairmarkit bid sheet (.xlsx)
     invoices/[id]/pdf/route.ts
     purchase-orders/[id]/pdf/route.ts
     job-deliveries/[id]/pdf/route.ts
+    import/fairmarkit/route.ts            # import a Fairmarkit bid sheet
+    import/nestle-po/route.ts             # import a Nestlé PO (PDF)
   layout.tsx  globals.css
 lib/
   supabase/    server.ts  client.ts  middleware.ts
   db/          queries.ts        # typed read helpers (server)
+               list.ts            # search/sort/date-range/paging plumbing
+               vehicle-history.ts # per-vehicle document timeline + totals
+               vehicles.ts        # find-or-create a vehicle from typed text
   actions/     *.ts              # 'use server' mutations per entity
   validation/  *.ts              # zod schemas (shared client+server)
   pdf/         fonts.ts  Letterhead.tsx  templates/{quotation,invoice,po,job-delivery}.tsx
+  xlsx/        read.ts  write.ts  xml.ts   # minimal OOXML reader/writer (fflate)
+  fairmarkit/  schema.ts  parse.ts  build.ts   # Fairmarkit RFQ round-trip
   utils/       money.ts  number-to-words.ts  dates.ts  cn.ts
   types.ts                       # DB row types
 components/
@@ -62,7 +70,9 @@ docs/                            # this folder
 
 ## Domain model
 Four documents: **Quotation → (accepted) → Invoice / Job Delivery**; **Purchase Order**
-is independent (Bade → supplier). Shared contacts: **customers**, **suppliers**,
+is independent (Bade → supplier). A quotation can additionally be imported from and
+exported to a **Fairmarkit** RFQ bid sheet (`docs/FAIRMARKIT.md`). All four documents
+link to a **vehicle**, which gives each one a service history (`docs/VEHICLES.md`). Shared contacts: **customers**, **suppliers**,
 **vehicles**. See `docs/DATABASE.md`.
 
 Money is `numeric(14,2)`; all totals are computed server-side from line items and stored
@@ -81,4 +91,6 @@ dashboard (Authentication → Users) — see `README`/`docs/PLAN.md`.
 - Document numbers come from the `next_document_number(doc_type)` RPC (atomic), editable
   before save, unique-constrained.
 - Amount-in-words via `lib/utils/number-to-words.ts` (Naira/Kobo), stored on save.
-- List pages read filters from `searchParams` (server-side search/sort/status/date-range).
+- List pages read filters from `searchParams` (server-side search/sort/status/date-range/
+  paging) and render `components/app/data-table.tsx` — a table on desktop, cards on
+  phones, with inline status changes. See `docs/LISTS.md`.

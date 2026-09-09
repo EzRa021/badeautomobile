@@ -11,6 +11,7 @@ import { toNumber, round2 } from "@/lib/utils/money";
 import { amountToWords } from "@/lib/utils/number-to-words";
 import { LineItemsEditor, emptyRow, type Row, type ColumnDef } from "@/components/app/line-items-editor";
 import { PartyPicker, type PartyOption, type PartyValue } from "@/components/app/party-picker";
+import { VehiclePicker, type VehicleOption, type VehicleValue } from "@/components/app/vehicle-picker";
 import { ImportPoButton } from "@/components/app/import-po-button";
 import type { ParsedPo } from "@/lib/pdf/parse-nestle-po";
 import { DocumentTotals } from "@/components/app/document-totals";
@@ -53,6 +54,7 @@ function seedRows(record?: InvoiceWithItems): Row[] {
 export function InvoiceForm({
   record,
   customers,
+  vehicles,
   defaultNo,
   defaultDate,
   defaultVatRate,
@@ -61,6 +63,7 @@ export function InvoiceForm({
 }: {
   record?: InvoiceWithItems;
   customers: PartyOption[];
+  vehicles: VehicleOption[];
   defaultNo: string;
   defaultDate: string;
   defaultVatRate: number;
@@ -70,6 +73,8 @@ export function InvoiceForm({
     customer_name?: string;
     customer_address?: string | null;
     po_no?: string | null;
+    vehicle_id?: string | null;
+    vehicle_label?: string | null;
     rows?: Row[];
   };
 }) {
@@ -82,6 +87,11 @@ export function InvoiceForm({
     id: record?.customer_id ?? seed?.customer_id ?? "",
     name: record?.customer_name ?? seed?.customer_name ?? "",
     address: record?.customer_address ?? seed?.customer_address ?? "",
+  });
+  const [vehicle, setVehicle] = useState<VehicleValue>({
+    id: record?.vehicle_id ?? seed?.vehicle_id ?? "",
+    label: record?.vehicle_label ?? seed?.vehicle_label ?? "",
+    reg_no: "",
   });
   const fe = state.fieldErrors ?? {};
   const formRef = useRef<HTMLFormElement>(null);
@@ -99,8 +109,13 @@ export function InvoiceForm({
       }
       if (d.vat_rate) setVatRate(d.vat_rate);
       setParty({ id: d.customer_id ?? "", name: d.customer_name ?? "", address: d.customer_address ?? "" });
+      setVehicle({
+        id: d.vehicle_id ?? "",
+        label: d.vehicle_label ?? "",
+        reg_no: d.vehicle_reg_no ?? "",
+      });
     },
-    deps: [rows, party, vatRate],
+    deps: [rows, party, vatRate, vehicle],
   });
 
   useEffect(() => {
@@ -201,9 +216,9 @@ export function InvoiceForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Customer</CardTitle>
+          <CardTitle>Customer &amp; vehicle</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-5">
           <PartyPicker
             label="Customer"
             idName="customer_id"
@@ -214,6 +229,7 @@ export function InvoiceForm({
             onChange={setParty}
             errors={{ name: fe.customer_name?.[0] }}
           />
+          <VehiclePicker options={vehicles} value={vehicle} onChange={setVehicle} />
         </CardContent>
       </Card>
 

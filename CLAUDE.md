@@ -16,6 +16,9 @@ Each is created from form input and exported to a **PDF that matches the templat
 - `docs/TEMPLATES.md` — exact fields & geometry of every template.
 - `docs/DATABASE.md` + `supabase/migrations/0001_initial_schema.sql` — schema.
 - `docs/PDF.md` — how PDFs are generated and kept faithful.
+- `docs/FAIRMARKIT.md` — importing/exporting Fairmarkit RFQ bid sheets on a quotation.
+- `docs/VEHICLES.md` — vehicle capture on documents + the per-vehicle service history.
+- `docs/LISTS.md` — the shared list/table stack (search, sort, date range, paging).
 - `docs/PLAN.md` — build order / checklist.
 
 ## Stack

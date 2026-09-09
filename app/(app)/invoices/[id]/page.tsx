@@ -8,6 +8,7 @@ import { formatDisplayDate } from "@/lib/utils/dates";
 import { formatNaira, formatAmount } from "@/lib/utils/money";
 import { PageHeader } from "@/components/app/page-header";
 import { ReferenceChip } from "@/components/app/reference-chip";
+import { VehicleLink } from "@/components/app/vehicle-link";
 import { StatusSelect } from "@/components/app/status-select";
 import { PdfButtons } from "@/components/app/pdf-buttons";
 import { ConfirmDelete } from "@/components/app/confirm-delete";
@@ -146,6 +147,14 @@ export default async function InvoiceDetailPage({
             <CardContent className="space-y-4">
               <StatusSelect action={setInvoiceStatus} id={inv.id} current={inv.status} options={STATUS_OPTIONS} />
               <dl className="space-y-2 text-sm">
+                {(inv.vehicle_id || inv.vehicle_label) && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">Vehicle</dt>
+                    <dd className="text-right">
+                      <VehicleLink id={inv.vehicle_id} label={inv.vehicle_label} />
+                    </dd>
+                  </div>
+                )}
                 {inv.customer_number && (
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Customer no.</dt>

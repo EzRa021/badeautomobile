@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/app/page-header";
 import { InvoiceForm } from "@/components/app/invoice-form";
-import { listCustomers, getQuotation, getCompanySettings } from "@/lib/db/queries";
+import { listCustomers, listVehicles, getQuotation, getCompanySettings } from "@/lib/db/queries";
 import { peekDocumentNumber } from "@/lib/db/numbering";
 import { toDateInputValue } from "@/lib/utils/dates";
 import { toNumber } from "@/lib/utils/money";
@@ -16,14 +16,22 @@ export default async function NewInvoicePage({
 }) {
   const { from_quotation } = await searchParams;
 
-  const [customers, defaultNo, settings] = await Promise.all([
+  const [customers, vehicles, defaultNo, settings] = await Promise.all([
     listCustomers(),
+    listVehicles(),
     peekDocumentNumber("invoice"),
     getCompanySettings(),
   ]);
 
   let seed:
-    | { customer_id?: string | null; customer_name?: string; customer_address?: string | null; rows?: Row[] }
+    | {
+        customer_id?: string | null;
+        customer_name?: string;
+        customer_address?: string | null;
+        vehicle_id?: string | null;
+        vehicle_label?: string | null;
+        rows?: Row[];
+      }
     | undefined;
 
   if (from_quotation) {
@@ -33,6 +41,8 @@ export default async function NewInvoicePage({
         customer_id: q.customer_id,
         customer_name: q.customer_name,
         customer_address: q.customer_address,
+        vehicle_id: q.vehicle_id,
+        vehicle_label: q.vehicle_label,
         rows: q.items.map((it) => {
           const unit = it.rate != null ? it.rate : it.qty ? toNumber(it.amount) / toNumber(it.qty) : 0;
           return {
@@ -55,6 +65,7 @@ export default async function NewInvoicePage({
       />
       <InvoiceForm
         customers={customers}
+        vehicles={vehicles}
         defaultNo={defaultNo}
         defaultDate={toDateInputValue(new Date())}
         defaultVatRate={settings?.vat_rate ?? 7.5}

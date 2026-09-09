@@ -10,9 +10,9 @@ export const metadata: Metadata = { title: "New job delivery" };
 export default async function NewJobDeliveryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from_quotation?: string }>;
+  searchParams: Promise<{ from_quotation?: string; vehicle?: string }>;
 }) {
-  const { from_quotation } = await searchParams;
+  const { from_quotation, vehicle: vehicleId } = await searchParams;
 
   const [customers, vehicles, defaultNo] = await Promise.all([
     listCustomers(),
@@ -30,6 +30,12 @@ export default async function NewJobDeliveryPage({
         work_done?: string | null;
       }
     | undefined;
+
+  if (!from_quotation && vehicleId) {
+    // Started from a vehicle's history page — pre-select it.
+    const v = await getVehicle(vehicleId);
+    if (v) seed = { vehicle_id: v.id, vehicle: v.description };
+  }
 
   if (from_quotation) {
     const q = await getQuotation(from_quotation);

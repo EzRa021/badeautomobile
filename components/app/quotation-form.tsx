@@ -3,15 +3,21 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
-import type { QuotationWithItems, Vehicle } from "@/lib/types";
+import type { QuotationWithItems } from "@/lib/types";
+import type { FairmarkitImport } from "@/lib/fairmarkit/parse";
+import type { FairmarkitSource } from "@/lib/fairmarkit/schema";
 import type { ActionState } from "@/lib/validation/shared";
 import { saveQuotation } from "@/lib/actions/quotations";
 import { useFormDraft } from "@/lib/hooks/use-form-draft";
 import { toNumber, round2 } from "@/lib/utils/money";
 import { amountToWords } from "@/lib/utils/number-to-words";
+import { extractVehicleFromTitle } from "@/lib/utils/vehicle";
 import { LineItemsEditor, emptyRow, type Row, type ColumnDef } from "@/components/app/line-items-editor";
 import { PartyPicker, type PartyOption, type PartyValue } from "@/components/app/party-picker";
+import { VehiclePicker, type VehicleOption, type VehicleValue } from "@/components/app/vehicle-picker";
 import { DocumentTotals } from "@/components/app/document-totals";
+import { FairmarkitPanel } from "@/components/app/fairmarkit-panel";
+import { ImportFairmarkitButton } from "@/components/app/import-fairmarkit-button";
 import { FormField } from "@/components/app/form-field";
 import { FormActionBar } from "@/components/app/form-action-bar";
 import { SubmitButton } from "@/components/app/submit-button";
@@ -58,12 +64,15 @@ export function QuotationForm({
   vehicles,
   defaultRef,
   defaultDate,
+  defaultVehicle,
 }: {
   record?: QuotationWithItems;
   customers: PartyOption[];
-  vehicles: Pick<Vehicle, "id" | "description">[];
+  vehicles: VehicleOption[];
   defaultRef: string;
   defaultDate: string;
+  /** Pre-selected vehicle, e.g. when starting from a vehicle's history page. */
+  defaultVehicle?: VehicleValue;
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(saveQuotation, {});
   const [rows, setRows] = useState<Row[]>(() => seedRows(record));
@@ -72,8 +81,64 @@ export function QuotationForm({
     name: record?.customer_name ?? "",
     address: record?.customer_address ?? "",
   });
+  const [jobTitle, setJobTitle] = useState(record?.job_title ?? "");
+  const [vehicle, setVehicle] = useState<VehicleValue>({
+    id: record?.vehicle_id ?? defaultVehicle?.id ?? "",
+    label: record?.vehicle_label ?? defaultVehicle?.label ?? "",
+    reg_no: defaultVehicle?.reg_no ?? "",
+  });
+  const [fairmarkit, setFairmarkit] = useState<FairmarkitSource | null>(
+    record?.fairmarkit ?? null,
+  );
   const fe = state.fieldErrors ?? {};
   const formRef = useRef<HTMLFormElement>(null);
+
+  /**
+   * A Fairmarkit bid sheet carries the item names, quantities and units but no
+   * prices — those are what this form is for. Imported details only fill fields
+   * that are still empty, so re-importing never overwrites typed-in work.
+   */
+  function handleFairmarkitImport(result: FairmarkitImport) {
+    setFairmarkit(result.source);
+    setRows(
+      result.items.length
+        ? result.items.map((item) => ({
+            description: item.description,
+            qty: String(item.qty),
+            unit: item.unit,
+            rate: "",
+            amount: "",
+          }))
+        : [emptyRow(COLUMNS)],
+    );
+
+    const buyer = result.customer_name;
+    if (buyer) {
+      setParty((current) => {
+        if (current.name.trim()) return current;
+        const onFile = customers.find(
+          (c) => c.name.trim().toLowerCase() === buyer.trim().toLowerCase(),
+        );
+        return {
+          id: onFile?.id ?? "",
+          name: onFile?.name ?? buyer,
+          address: onFile?.address ?? result.source.meta.shipping_address ?? "",
+        };
+      });
+    }
+    if (result.job_title) setJobTitle((current) => current.trim() || result.job_title!);
+
+    // RFQ titles name the vehicle and its plate, e.g.
+    // "RFQ For Repair Of Toyota Prado LSD 656 HD @Flowergate Factory".
+    const guess = extractVehicleFromTitle(result.job_title);
+    if (guess.label || guess.reg_no) {
+      setVehicle((current) =>
+        current.id || current.label.trim() || current.reg_no.trim()
+          ? current
+          : { id: "", label: guess.label ?? "", reg_no: guess.reg_no ?? "" },
+      );
+    }
+  }
 
   const draft = useFormDraft({
     storageKey: `bade:draft:v1:quotation:${record?.id ?? "new"}`,
@@ -87,8 +152,21 @@ export function QuotationForm({
         }
       }
       setParty({ id: d.customer_id ?? "", name: d.customer_name ?? "", address: d.customer_address ?? "" });
+      setJobTitle(d.job_title ?? "");
+      setVehicle({
+        id: d.vehicle_id ?? "",
+        label: d.vehicle_label ?? "",
+        reg_no: d.vehicle_reg_no ?? "",
+      });
+      if (d.fairmarkit) {
+        try {
+          setFairmarkit(JSON.parse(d.fairmarkit) as FairmarkitSource);
+        } catch {
+          /* ignore a corrupt draft */
+        }
+      }
     },
-    deps: [rows, party],
+    deps: [rows, party, jobTitle, vehicle, fairmarkit],
   });
 
   // Keep the draft after a failed submit so a refresh doesn't lose the work.
@@ -105,6 +183,7 @@ export function QuotationForm({
     <form ref={formRef} action={formAction} onSubmit={() => draft.clear()} className="space-y-5">
       {record && <input type="hidden" name="id" value={record.id} />}
       <input type="hidden" name="items" value={JSON.stringify(cleanRows)} />
+      <input type="hidden" name="fairmarkit" value={fairmarkit ? JSON.stringify(fairmarkit) : ""} />
 
       <Card>
         <CardHeader>
@@ -129,9 +208,17 @@ export function QuotationForm({
         </CardContent>
       </Card>
 
+      {fairmarkit && (
+        <FairmarkitPanel
+          source={fairmarkit}
+          onChange={setFairmarkit}
+          onRemove={() => setFairmarkit(null)}
+        />
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle>Customer</CardTitle>
+          <CardTitle>Customer &amp; vehicle</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           <PartyPicker
@@ -144,27 +231,25 @@ export function QuotationForm({
             onChange={setParty}
             errors={{ name: fe.customer_name?.[0] }}
           />
-          <div className="grid gap-5 sm:grid-cols-2">
-            <FormField label="Vehicle" htmlFor="vehicle_id" hint="Optional — from your registry">
-              <NativeSelect id="vehicle_id" name="vehicle_id" defaultValue={record?.vehicle_id ?? ""}>
-                <option value="">— None —</option>
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.description}
-                  </option>
-                ))}
-              </NativeSelect>
-            </FormField>
+          <VehiclePicker options={vehicles} value={vehicle} onChange={setVehicle} />
+          <div className="grid gap-5">
             <FormField label="Job title / heading" htmlFor="job_title" hint="Banner above the items">
-              <Input id="job_title" name="job_title" defaultValue={record?.job_title ?? ""} placeholder="CARRY OUT REPAIRS ON …" />
+              <Input
+                id="job_title"
+                name="job_title"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="CARRY OUT REPAIRS ON …"
+              />
             </FormField>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
           <CardTitle>Items</CardTitle>
+          <ImportFairmarkitButton onImport={handleFairmarkitImport} className="shrink-0" />
         </CardHeader>
         <CardContent className="space-y-4">
           <LineItemsEditor columns={COLUMNS} rows={rows} onChange={setRows} deriveRow={deriveRow} />

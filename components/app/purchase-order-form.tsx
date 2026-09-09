@@ -11,6 +11,7 @@ import { toNumber, round2 } from "@/lib/utils/money";
 import { amountToWords } from "@/lib/utils/number-to-words";
 import { LineItemsEditor, emptyRow, type Row, type ColumnDef } from "@/components/app/line-items-editor";
 import { PartyPicker, type PartyOption, type PartyValue } from "@/components/app/party-picker";
+import { VehiclePicker, type VehicleOption, type VehicleValue } from "@/components/app/vehicle-picker";
 import { DocumentTotals } from "@/components/app/document-totals";
 import { FormField } from "@/components/app/form-field";
 import { FormActionBar } from "@/components/app/form-action-bar";
@@ -51,11 +52,13 @@ function seedRows(record?: PurchaseOrderWithItems): Row[] {
 export function PurchaseOrderForm({
   record,
   suppliers,
+  vehicles,
   defaultNo,
   defaultDate,
 }: {
   record?: PurchaseOrderWithItems;
   suppliers: PartyOption[];
+  vehicles: VehicleOption[];
   defaultNo: string;
   defaultDate: string;
 }) {
@@ -66,6 +69,11 @@ export function PurchaseOrderForm({
     id: record?.supplier_id ?? "",
     name: record?.supplier_name ?? "",
     address: record?.supplier_address ?? "",
+  });
+  const [vehicle, setVehicle] = useState<VehicleValue>({
+    id: record?.vehicle_id ?? "",
+    label: record?.vehicle_ref ?? "",
+    reg_no: "",
   });
   const fe = state.fieldErrors ?? {};
   const formRef = useRef<HTMLFormElement>(null);
@@ -83,8 +91,13 @@ export function PurchaseOrderForm({
       }
       if (d.vat_rate) setVatRate(d.vat_rate);
       setParty({ id: d.supplier_id ?? "", name: d.supplier_name ?? "", address: d.supplier_address ?? "" });
+      setVehicle({
+        id: d.vehicle_id ?? "",
+        label: d.vehicle_ref ?? "",
+        reg_no: d.vehicle_reg_no ?? "",
+      });
     },
-    deps: [rows, party, vatRate],
+    deps: [rows, party, vatRate, vehicle],
   });
 
   useEffect(() => {
@@ -138,9 +151,21 @@ export function PurchaseOrderForm({
           <FormField label="VAT rate (%)" htmlFor="vat_rate" hint="0 for none">
             <Input id="vat_rate" name="vat_rate" inputMode="decimal" value={vatRate} onChange={(e) => setVatRate(e.target.value)} />
           </FormField>
-          <FormField label="Vehicle / job ref" htmlFor="vehicle_ref" hint="Optional">
-            <Input id="vehicle_ref" name="vehicle_ref" defaultValue={record?.vehicle_ref ?? ""} />
-          </FormField>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Vehicle / job</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <VehiclePicker
+            options={vehicles}
+            value={vehicle}
+            onChange={setVehicle}
+            labelName="vehicle_ref"
+            labelHint="Printed as “Vehicle / Job”"
+          />
         </CardContent>
       </Card>
 

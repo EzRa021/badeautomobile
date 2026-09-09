@@ -1,5 +1,7 @@
 // Row types mirroring supabase/migrations/0001_initial_schema.sql
 
+import type { FairmarkitSource } from "@/lib/fairmarkit/schema";
+
 export type DocType = "quotation" | "invoice" | "purchase_order" | "job_delivery";
 
 export type QuotationStatus = "draft" | "sent" | "accepted" | "rejected" | "invoiced";
@@ -51,6 +53,8 @@ export interface Vehicle {
   customer_id: string | null;
   description: string;
   reg_no: string | null;
+  /** Generated: `reg_no` upper-cased with punctuation stripped, for matching. */
+  reg_no_key: string | null;
   make: string | null;
   model: string | null;
   notes: string | null;
@@ -67,12 +71,15 @@ export interface Quotation {
   customer_name: string;
   customer_address: string | null;
   vehicle_id: string | null;
+  vehicle_label: string | null;
   job_title: string | null;
   subtotal: number;
   total: number;
   amount_in_words: string | null;
   status: QuotationStatus;
   notes: string | null;
+  /** Snapshot of the source Fairmarkit RFQ sheet, when the quote was imported from one. */
+  fairmarkit: FairmarkitSource | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -98,6 +105,8 @@ export interface Invoice {
   customer_address: string | null;
   customer_number: string | null;
   po_no: string | null;
+  vehicle_id: string | null;
+  vehicle_label: string | null;
   vat_rate: number;
   subtotal: number;
   vat_total: number;
@@ -133,6 +142,7 @@ export interface PurchaseOrder {
   supplier_name: string;
   supplier_address: string | null;
   deliver_to: string | null;
+  vehicle_id: string | null;
   vehicle_ref: string | null;
   vat_rate: number;
   subtotal: number;

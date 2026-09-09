@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil, Receipt, Truck } from "lucide-react";
+import { FileSpreadsheet, Pencil, Receipt, Truck } from "lucide-react";
 import { getQuotation } from "@/lib/db/queries";
 import { deleteQuotation, setQuotationStatus } from "@/lib/actions/quotations";
+import { planFairmarkitExport } from "@/lib/fairmarkit/build";
+import { fairmarkitSourceSchema } from "@/lib/fairmarkit/schema";
 import { formatDisplayDate } from "@/lib/utils/dates";
 import { formatNaira, formatAmount } from "@/lib/utils/money";
 import { PageHeader } from "@/components/app/page-header";
 import { ReferenceChip } from "@/components/app/reference-chip";
+import { VehicleLink } from "@/components/app/vehicle-link";
 import { StatusSelect } from "@/components/app/status-select";
 import { PdfButtons } from "@/components/app/pdf-buttons";
 import { ConfirmDelete } from "@/components/app/confirm-delete";
@@ -33,6 +36,12 @@ export default async function QuotationDetailPage({
   const { id } = await params;
   const q = await getQuotation(id);
   if (!q) notFound();
+
+  // Re-validate the stored snapshot: it may predate a change to the shape.
+  const parsedSource = q.fairmarkit ? fairmarkitSourceSchema.safeParse(q.fairmarkit) : null;
+  const fairmarkit = parsedSource?.success ? parsedSource.data : null;
+  const fairmarkitPlan = fairmarkit ? planFairmarkitExport(fairmarkit, q.items) : null;
+  const bidSheetHref = `/api/quotations/${q.id}/fairmarkit`;
 
   return (
     <>
@@ -148,9 +157,69 @@ export default async function QuotationDetailPage({
                   <dt className="text-muted-foreground">Items</dt>
                   <dd>{q.items.length}</dd>
                 </div>
+                {(q.vehicle_id || q.vehicle_label) && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">Vehicle</dt>
+                    <dd className="text-right">
+                      <VehicleLink id={q.vehicle_id} label={q.vehicle_label} />
+                    </dd>
+                  </div>
+                )}
               </dl>
             </CardContent>
           </Card>
+
+          {fairmarkit && fairmarkitPlan && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
+                  Fairmarkit
+                  {fairmarkit.meta.rfq_id && (
+                    <ReferenceChip>RFQ {fairmarkit.meta.rfq_id}</ReferenceChip>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <dl className="space-y-2 text-sm">
+                  {fairmarkit.meta.buyer_name && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">Buyer</dt>
+                      <dd className="text-right">{fairmarkit.meta.buyer_name}</dd>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">Lines priced</dt>
+                    <dd>
+                      {fairmarkitPlan.bidCount} of {fairmarkit.lines.length}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">Quote valid</dt>
+                    <dd>{fairmarkit.meta.valid_days} days</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">Delivery</dt>
+                    <dd>{fairmarkit.meta.delivery_days} days</dd>
+                  </div>
+                </dl>
+                <Button asChild size="sm" className="w-full justify-start">
+                  <a href={bidSheetHref}>
+                    <FileSpreadsheet /> Download bid sheet
+                  </a>
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Upload this .xlsx on the RFQ&rsquo;s import tab in Fairmarkit.
+                </p>
+                {fairmarkitPlan.unmatchedItems.length > 0 && (
+                  <p className="text-xs font-medium text-amber-700">
+                    {fairmarkitPlan.unmatchedItems.length} item
+                    {fairmarkitPlan.unmatchedItems.length === 1 ? " is" : "s are"} not on the
+                    RFQ and will not be sent — Fairmarkit only accepts its own lines.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
@@ -167,6 +236,13 @@ export default async function QuotationDetailPage({
                   <Truck /> Create job delivery
                 </Link>
               </Button>
+              {!fairmarkit && (
+                <Button asChild variant="outline" size="sm" className="justify-start">
+                  <a href={bidSheetHref}>
+                    <FileSpreadsheet /> Fairmarkit bid sheet
+                  </a>
+                </Button>
+              )}
             </CardContent>
           </Card>
 

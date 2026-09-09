@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient, requireUser } from "@/lib/supabase/server";
 import { quotationSchema } from "@/lib/validation/documents";
 import { bumpDocumentCounter } from "@/lib/db/numbering";
+import { resolveVehicle } from "@/lib/db/vehicles";
 import { amountToWords } from "@/lib/utils/number-to-words";
 import { round2 } from "@/lib/utils/money";
 import type { ActionState } from "@/lib/validation/shared";
@@ -32,9 +33,12 @@ export async function saveQuotation(
     customer_name: formData.get("customer_name"),
     customer_address: formData.get("customer_address"),
     vehicle_id: formData.get("vehicle_id"),
+    vehicle_label: formData.get("vehicle_label"),
+    vehicle_reg_no: formData.get("vehicle_reg_no"),
     job_title: formData.get("job_title"),
     status: formData.get("status") || "draft",
     notes: formData.get("notes"),
+    fairmarkit: formData.get("fairmarkit"),
     items: parseItems(formData.get("items")),
   });
   if (!parsed.success) {
@@ -46,6 +50,18 @@ export async function saveQuotation(
   }
 
   const data = parsed.data;
+
+  // Register the vehicle (or link the existing one) so it gains a history.
+  const vehicle = await resolveVehicle(
+    {
+      id: data.vehicle_id,
+      label: data.vehicle_label,
+      reg_no: data.vehicle_reg_no,
+      customer_id: data.customer_id,
+    },
+    user.id,
+  );
+
   const subtotal = round2(data.items.reduce((s, it) => s + it.amount, 0));
   const total = subtotal;
   const amount_in_words = amountToWords(total, { uppercase: true });
@@ -56,13 +72,15 @@ export async function saveQuotation(
     customer_id: data.customer_id,
     customer_name: data.customer_name,
     customer_address: data.customer_address,
-    vehicle_id: data.vehicle_id,
+    vehicle_id: vehicle.id,
+    vehicle_label: vehicle.label,
     job_title: data.job_title,
     subtotal,
     total,
     amount_in_words,
     status: data.status,
     notes: data.notes,
+    fairmarkit: data.fairmarkit,
   };
 
   const supabase = await createClient();
