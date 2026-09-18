@@ -73,15 +73,32 @@ export async function parseNestlePo(data: Uint8Array): Promise<ParsedPo> {
   const po_no = poMatch ? poMatch[1] : null;
 
   // Items: header line "<item#> <materialNo> <description>" followed by a
-  // "<qty> <unit> <unitPrice> <netValue>" line.
-  const items: (ParsedPoItem & { _line: number })[] = [];
+  // "<qty> <unit> <unitPrice> <netValue>" line. When an item falls at a page
+  // break, the next page's letterhead, PO/page info, and repeated column
+  // headers get inserted between the header line and its quantity line — so
+  // the quantity line is searched for anywhere before the *next* item's
+  // header, not just on the immediately following line.
+  const headerRe = /^(\d{1,3})\s+(\d{6,})\s+(.+)$/;
+  const qtyRe = /^([\d,]+(?:\.\d+)?)\s+([A-Za-z]+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/;
+
+  const headerIdx: number[] = [];
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^(\d{1,3})\s+(\d{6,})\s+(.+)$/);
-    if (!m) continue;
-    const q = (lines[i + 1] ?? "").match(
-      /^([\d,]+(?:\.\d+)?)\s+([A-Za-z]+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/,
-    );
+    if (headerRe.test(lines[i])) headerIdx.push(i);
+  }
+
+  const items: (ParsedPoItem & { _line: number })[] = [];
+  for (let h = 0; h < headerIdx.length; h++) {
+    const i = headerIdx[h];
+    const m = lines[i].match(headerRe)!;
+    const end = h + 1 < headerIdx.length ? headerIdx[h + 1] : lines.length;
+
+    let q: RegExpMatchArray | null = null;
+    for (let j = i + 1; j < end; j++) {
+      q = lines[j].match(qtyRe);
+      if (q) break;
+    }
     if (!q) continue;
+
     items.push({
       item_code: m[2],
       description: m[3].trim(),
