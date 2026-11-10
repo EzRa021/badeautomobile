@@ -20,12 +20,21 @@ const dateNullable = z.preprocess(
 );
 
 // ---------------------------------------------------------------- Quotation
+/** "percent" | "amount"; anything else (including blank) means percent. */
+const zDiscountType = z.preprocess(
+  (v) => (v === "amount" ? "amount" : "percent"),
+  z.enum(["percent", "amount"]),
+);
+
 export const quotationItemSchema = z.object({
   description: zRequiredText("Item description"),
   qty: zQty,
   unit: zOptText,
   rate: zMoneyNullable,
+  /** Gross line amount as typed — only trusted when there is no rate. */
   amount: zMoney,
+  discount_type: zDiscountType,
+  discount_value: zMoney,
 });
 
 export const quotationSchema = z.object({
@@ -38,6 +47,9 @@ export const quotationSchema = z.object({
   vehicle_label: zOptText,
   vehicle_reg_no: zOptText,
   job_title: zOptText,
+  /** Whole-quotation discount, applied to the sub-total after item discounts. */
+  discount_type: zDiscountType,
+  discount_value: zMoney,
   status: z
     .enum(["draft", "sent", "accepted", "rejected", "invoiced"])
     .default("draft"),

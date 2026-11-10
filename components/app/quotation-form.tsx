@@ -9,13 +9,22 @@ import type { FairmarkitSource } from "@/lib/fairmarkit/schema";
 import type { ActionState } from "@/lib/validation/shared";
 import { saveQuotation } from "@/lib/actions/quotations";
 import { useFormDraft } from "@/lib/hooks/use-form-draft";
-import { toNumber, round2 } from "@/lib/utils/money";
+import { toNumber, round2, formatAmount, formatNaira } from "@/lib/utils/money";
+import {
+  computeLine,
+  computeQuotation,
+  discountIssueMessage,
+  normalizeDiscountType,
+  type DiscountType,
+  type LineInput,
+} from "@/lib/utils/discount";
 import { amountToWords } from "@/lib/utils/number-to-words";
 import { extractVehicleFromTitle } from "@/lib/utils/vehicle";
 import { LineItemsEditor, emptyRow, type Row, type ColumnDef } from "@/components/app/line-items-editor";
 import { PartyPicker, type PartyOption, type PartyValue } from "@/components/app/party-picker";
 import { VehiclePicker, type VehicleOption, type VehicleValue } from "@/components/app/vehicle-picker";
 import { DocumentTotals } from "@/components/app/document-totals";
+import { DiscountInput } from "@/components/app/discount-input";
 import { FairmarkitPanel } from "@/components/app/fairmarkit-panel";
 import { ImportFairmarkitButton } from "@/components/app/import-fairmarkit-button";
 import { FormField } from "@/components/app/form-field";
@@ -25,9 +34,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const COLUMNS: ColumnDef[] = [
+const STATUSES = ["draft", "sent", "accepted", "rejected", "invoiced"];
+
+/** Qty, unit, rate and amount as the form has always had them. */
+const BASE_COLUMNS: ColumnDef[] = [
   { key: "description", label: "Description", grow: true, placeholder: "Part or service" },
   { key: "qty", label: "Qty", kind: "number", width: "5rem" },
   { key: "unit", label: "Unit", width: "5rem", placeholder: "Pcs" },
@@ -35,7 +48,50 @@ const COLUMNS: ColumnDef[] = [
   { key: "amount", label: "Amount ₦", kind: "money", align: "right", width: "9rem" },
 ];
 
-const STATUSES = ["draft", "sent", "accepted", "rejected", "invoiced"];
+/** With per-item discounts: amount before the discount, the discount, then the net. */
+function discountColumns(showDiscount: boolean): ColumnDef[] {
+  if (!showDiscount) return BASE_COLUMNS;
+  return [
+    { key: "description", label: "Description", grow: true, placeholder: "Part or service" },
+    { key: "qty", label: "Qty", kind: "number", width: "4.5rem" },
+    { key: "unit", label: "Unit", width: "4.5rem", placeholder: "Pcs" },
+    { key: "rate", label: "Rate ₦", kind: "money", align: "right", width: "6.5rem" },
+    { key: "amount", label: "Gross ₦", kind: "money", align: "right", width: "6.5rem" },
+    {
+      key: "discount_value",
+      typeKey: "discount_type",
+      label: "Discount",
+      kind: "discount",
+      width: "9rem",
+      invalid: (row) => lineIssue(row),
+    },
+    {
+      key: "net",
+      label: "Amount ₦",
+      kind: "money",
+      align: "right",
+      width: "7.75rem",
+      computed: true,
+      value: (row) => formatAmount(computeLine(rowToLine(row, true)).net),
+    },
+  ];
+}
+
+/** A form row as the shared discount maths sees it. Mirrors the server's coercions. */
+function rowToLine(row: Row, itemDiscounts: boolean): LineInput {
+  return {
+    qty: row.qty?.trim() === "" || row.qty == null ? 1 : toNumber(row.qty),
+    rate: row.rate?.trim() === "" || row.rate == null ? null : toNumber(row.rate),
+    amount: toNumber(row.amount),
+    discount_type: normalizeDiscountType(row.discount_type),
+    discount_value: itemDiscounts ? round2(toNumber(row.discount_value)) : 0,
+  };
+}
+
+function lineIssue(row: Row): string | null {
+  const line = computeLine(rowToLine(row, true));
+  return line.issue ? discountIssueMessage(line.issue, { amount: line.gross, noun: "line amount" }) : null;
+}
 
 function deriveRow(row: Row): Row {
   const rate = row.rate.trim();
@@ -45,18 +101,31 @@ function deriveRow(row: Row): Row {
   return row;
 }
 
+function blankRow(): Row {
+  return { ...emptyRow(BASE_COLUMNS), discount_value: "", discount_type: "percent" };
+}
+
+/** `amount` is stored as the line NET, so the gross to edit is net + discount. */
 function seedRows(record?: QuotationWithItems): Row[] {
   if (record?.items?.length) {
-    return record.items.map((it) => ({
-      description: it.description,
-      qty: String(it.qty ?? ""),
-      unit: it.unit ?? "",
-      rate: it.rate != null ? String(it.rate) : "",
-      amount: String(it.amount ?? ""),
-    }));
+    return record.items.map((it) => {
+      const discount = Number(it.discount_amount ?? 0);
+      const value = Number(it.discount_value ?? 0);
+      return {
+        description: it.description,
+        qty: String(it.qty ?? ""),
+        unit: it.unit ?? "",
+        rate: it.rate != null ? String(it.rate) : "",
+        amount: String(round2(Number(it.amount ?? 0) + discount)),
+        discount_value: value > 0 ? String(value) : "",
+        discount_type: normalizeDiscountType(it.discount_type),
+      };
+    });
   }
-  return [emptyRow(COLUMNS)];
+  return [blankRow()];
 }
+
+const hasValue = (v: string | undefined) => toNumber(v) > 0;
 
 export function QuotationForm({
   record,
@@ -76,6 +145,14 @@ export function QuotationForm({
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(saveQuotation, {});
   const [rows, setRows] = useState<Row[]>(() => seedRows(record));
+  // Per-item discounts are opt-in so the form stays as simple as before until they're wanted.
+  const [itemDiscounts, setItemDiscounts] = useState(() =>
+    seedRows(record).some((r) => hasValue(r.discount_value)),
+  );
+  const [overall, setOverall] = useState<{ type: DiscountType; value: string }>(() => ({
+    type: normalizeDiscountType(record?.discount_type),
+    value: Number(record?.discount_value ?? 0) > 0 ? String(record?.discount_value) : "",
+  }));
   const [party, setParty] = useState<PartyValue>({
     id: record?.customer_id ?? "",
     name: record?.customer_name ?? "",
@@ -108,8 +185,10 @@ export function QuotationForm({
             unit: item.unit,
             rate: "",
             amount: "",
+            discount_value: "",
+            discount_type: "percent",
           }))
-        : [emptyRow(COLUMNS)],
+        : [blankRow()],
     );
 
     const buyer = result.customer_name;
@@ -146,11 +225,17 @@ export function QuotationForm({
     restore: (d) => {
       if (d.items) {
         try {
-          setRows(JSON.parse(d.items) as Row[]);
+          const restored = JSON.parse(d.items) as Row[];
+          setRows(restored);
+          setItemDiscounts(restored.some((r) => hasValue(r.discount_value)));
         } catch {
           /* ignore */
         }
       }
+      setOverall({
+        type: normalizeDiscountType(d.discount_type),
+        value: d.discount_value ?? "",
+      });
       setParty({ id: d.customer_id ?? "", name: d.customer_name ?? "", address: d.customer_address ?? "" });
       setJobTitle(d.job_title ?? "");
       setVehicle({
@@ -166,7 +251,7 @@ export function QuotationForm({
         }
       }
     },
-    deps: [rows, party, jobTitle, vehicle, fairmarkit],
+    deps: [rows, party, jobTitle, vehicle, fairmarkit, overall, itemDiscounts],
   });
 
   // Keep the draft after a failed submit so a refresh doesn't lose the work.
@@ -175,14 +260,74 @@ export function QuotationForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
+  const columns = useMemo(() => discountColumns(itemDiscounts), [itemDiscounts]);
   const cleanRows = useMemo(() => rows.filter((r) => r.description.trim()), [rows]);
-  const subtotal = useMemo(() => round2(cleanRows.reduce((s, r) => s + toNumber(r.amount), 0)), [cleanRows]);
-  const words = useMemo(() => amountToWords(subtotal, { uppercase: true }), [subtotal]);
+
+  // The same maths the server runs when saving — so what you see is what is stored and printed.
+  const calc = useMemo(
+    () =>
+      computeQuotation(
+        cleanRows.map((r) => rowToLine(r, itemDiscounts)),
+        { type: overall.type, value: round2(toNumber(overall.value)) },
+      ),
+    [cleanRows, itemDiscounts, overall],
+  );
+  const words = useMemo(() => amountToWords(calc.total, { uppercase: true }), [calc.total]);
+
+  // What gets submitted: discounts the user hid are not applied, but stay in state if they come back.
+  const submittedItems = useMemo(
+    () =>
+      cleanRows.map((r) => ({
+        description: r.description,
+        qty: r.qty,
+        unit: r.unit,
+        rate: r.rate,
+        amount: r.amount,
+        discount_type: itemDiscounts ? normalizeDiscountType(r.discount_type) : "percent",
+        discount_value: itemDiscounts ? r.discount_value ?? "" : "",
+      })),
+    [cleanRows, itemDiscounts],
+  );
+
+  const discountProblems = useMemo(
+    () =>
+      calc.lines.flatMap((line, i) =>
+        line.issue
+          ? [
+              discountIssueMessage(line.issue, {
+                label: cleanRows[i].description,
+                amount: line.gross,
+                noun: "line amount",
+              }),
+            ]
+          : [],
+      ),
+    [calc.lines, cleanRows],
+  );
+  const overallProblem = calc.discountIssue
+    ? discountIssueMessage(calc.discountIssue, { amount: calc.subtotal, noun: "sub-total" })
+    : undefined;
+
+  const totalRows = [
+    ...(calc.discount > 0
+      ? [
+          { label: "Sub-total", value: calc.subtotal },
+          {
+            label: overall.type === "percent" ? `Discount (${round2(toNumber(overall.value))}%)` : "Discount",
+            value: calc.discount,
+            negative: true,
+          },
+        ]
+      : []),
+    { label: "Total", value: calc.total, bold: true },
+  ];
 
   return (
     <form ref={formRef} action={formAction} onSubmit={() => draft.clear()} className="space-y-5">
       {record && <input type="hidden" name="id" value={record.id} />}
-      <input type="hidden" name="items" value={JSON.stringify(cleanRows)} />
+      <input type="hidden" name="items" value={JSON.stringify(submittedItems)} />
+      <input type="hidden" name="discount_type" value={overall.type} />
+      <input type="hidden" name="discount_value" value={overall.value} />
       <input type="hidden" name="fairmarkit" value={fairmarkit ? JSON.stringify(fairmarkit) : ""} />
 
       <Card>
@@ -247,14 +392,67 @@ export function QuotationForm({
       </Card>
 
       <Card>
-        <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0">
           <CardTitle>Items</CardTitle>
-          <ImportFairmarkitButton onImport={handleFairmarkitImport} className="shrink-0" />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <label htmlFor="item-discounts" className="flex cursor-pointer items-center gap-2 text-sm">
+              <Checkbox
+                id="item-discounts"
+                checked={itemDiscounts}
+                onCheckedChange={(checked) => setItemDiscounts(checked === true)}
+              />
+              Discount per item
+            </label>
+            <ImportFairmarkitButton onImport={handleFairmarkitImport} className="shrink-0" />
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <LineItemsEditor columns={COLUMNS} rows={rows} onChange={setRows} deriveRow={deriveRow} />
-          {fe.items && <p className="text-xs font-medium text-destructive">{fe.items[0]}</p>}
-          <DocumentTotals rows={[{ label: "Total", value: subtotal, bold: true }]} words={words} />
+          <LineItemsEditor
+            columns={columns}
+            rows={rows}
+            onChange={setRows}
+            deriveRow={deriveRow}
+            minWidth={itemDiscounts ? "56rem" : "640px"}
+          />
+          {discountProblems.length > 0 ? (
+            <ul role="alert" className="space-y-0.5 text-xs font-medium text-destructive">
+              {discountProblems.map((m) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          ) : (
+            fe.items && (
+              <p className="text-xs font-medium text-destructive">{fe.items[0]}</p>
+            )
+          )}
+
+          <div className="grid items-start gap-5 border-t border-border pt-4 sm:grid-cols-[minmax(0,17rem)_1fr]">
+            <FormField
+              label="Discount on whole quotation"
+              htmlFor="overall-discount"
+              hint="Taken off the sub-total, after any item discounts."
+              error={overallProblem ?? fe.discount_value?.[0]}
+            >
+              <DiscountInput
+                id="overall-discount"
+                aria-label="Discount on whole quotation"
+                value={overall.value}
+                type={overall.type}
+                onValueChange={(value) => setOverall((o) => ({ ...o, value }))}
+                onTypeChange={(type) => setOverall((o) => ({ ...o, type }))}
+                invalid={Boolean(overallProblem ?? fe.discount_value?.[0])}
+              />
+            </FormField>
+            <DocumentTotals
+              rows={totalRows}
+              words={words}
+              note={
+                calc.itemDiscounts > 0
+                  ? `Includes ${formatNaira(calc.itemDiscounts)} in item discounts, already taken off the line amounts.`
+                  : undefined
+              }
+            />
+          </div>
         </CardContent>
       </Card>
 

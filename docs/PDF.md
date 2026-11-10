@@ -24,6 +24,8 @@ the measured geometry in `docs/TEMPLATES.md`.
 - **Quotation / Purchase Order**: bordered table, columns per the measured x-bounds; money
   right-aligned; a full-width banner row for the job title (quotation); pad empty rows so the
   TOTAL sits low on the page like the sample; render the ₦ header glyph.
+  With discounts the quotation gains an optional `DISC. (₦)` column and/or SUB-TOTAL / DISCOUNT
+  rows (see `docs/TEMPLATES.md`); with none it is identical to the sample.
 - **Invoice**: 4-line VAT block per item with horizontal rules; header customer/invoice boxes;
   `TOTAL INCLUDING TAX` in bold.
 - **Job Delivery**: form layout with labelled rows and dotted bottom-borders; boxed Invoice

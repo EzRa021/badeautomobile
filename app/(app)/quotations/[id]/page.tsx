@@ -8,6 +8,7 @@ import { planFairmarkitExport } from "@/lib/fairmarkit/build";
 import { fairmarkitSourceSchema } from "@/lib/fairmarkit/schema";
 import { formatDisplayDate } from "@/lib/utils/dates";
 import { formatNaira, formatAmount } from "@/lib/utils/money";
+import { itemsAtFinalPrice } from "@/lib/utils/discount";
 import { PageHeader } from "@/components/app/page-header";
 import { ReferenceChip } from "@/components/app/reference-chip";
 import { VehicleLink } from "@/components/app/vehicle-link";
@@ -40,7 +41,13 @@ export default async function QuotationDetailPage({
   // Re-validate the stored snapshot: it may predate a change to the shape.
   const parsedSource = q.fairmarkit ? fairmarkitSourceSchema.safeParse(q.fairmarkit) : null;
   const fairmarkit = parsedSource?.success ? parsedSource.data : null;
-  const fairmarkitPlan = fairmarkit ? planFairmarkitExport(fairmarkit, q.items) : null;
+  // A bid sheet carries one price per line, so discounts are folded into the lines.
+  const fairmarkitPlan = fairmarkit
+    ? planFairmarkitExport(fairmarkit, itemsAtFinalPrice(q.items, q.discount_amount))
+    : null;
+  const hasItemDiscount = q.items.some((it) => Number(it.discount_amount) > 0);
+  const itemDiscountTotal = q.items.reduce((sum, it) => sum + Number(it.discount_amount ?? 0), 0);
+  const overallDiscount = Number(q.discount_amount ?? 0);
   const bidSheetHref = `/api/quotations/${q.id}/fairmarkit`;
 
   return (
@@ -106,6 +113,7 @@ export default async function QuotationDetailPage({
                   <TableHead>Description</TableHead>
                   <TableHead className="w-24">Qty</TableHead>
                   <TableHead className="w-28 text-right">Rate ₦</TableHead>
+                  {hasItemDiscount && <TableHead className="w-32 text-right">Discount ₦</TableHead>}
                   <TableHead className="w-32 text-right">Amount ₦</TableHead>
                 </TableRow>
               </TableHeader>
@@ -120,6 +128,22 @@ export default async function QuotationDetailPage({
                     <TableCell className="text-right font-mono tabular-nums">
                       {it.rate != null ? formatAmount(it.rate) : ""}
                     </TableCell>
+                    {hasItemDiscount && (
+                      <TableCell className="text-right font-mono tabular-nums">
+                        {Number(it.discount_amount) > 0 ? (
+                          <>
+                            {formatAmount(it.discount_amount)}
+                            {it.discount_type === "percent" && (
+                              <span className="block text-xs text-muted-foreground">
+                                {Number(Number(it.discount_value).toFixed(2))}%
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          ""
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right font-mono tabular-nums">{formatAmount(it.amount)}</TableCell>
                   </TableRow>
                 ))}
@@ -128,10 +152,30 @@ export default async function QuotationDetailPage({
 
             <div className="flex justify-end border-t border-border pt-4">
               <div className="w-full max-w-xs space-y-1">
-                <div className="flex items-center justify-between text-base font-semibold">
+                {overallDiscount > 0 && (
+                  <>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Sub-total</span>
+                      <span className="font-mono tabular-nums">{formatNaira(q.subtotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>
+                        Discount
+                        {q.discount_type === "percent" && ` (${Number(Number(q.discount_value).toFixed(2))}%)`}
+                      </span>
+                      <span className="font-mono tabular-nums">−{formatNaira(overallDiscount)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex items-center justify-between border-t border-border pt-2 text-base font-semibold">
                   <span>Total</span>
                   <span className="font-mono tabular-nums">{formatNaira(q.total)}</span>
                 </div>
+                {hasItemDiscount && (
+                  <p className="text-right text-xs text-muted-foreground">
+                    Includes {formatNaira(itemDiscountTotal)} in item discounts, already taken off the line amounts.
+                  </p>
+                )}
                 {q.amount_in_words && (
                   <p className="text-right text-xs text-muted-foreground">{q.amount_in_words}</p>
                 )}

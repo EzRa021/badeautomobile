@@ -7,6 +7,7 @@ import {
   synthesizeSource,
 } from "@/lib/fairmarkit/build";
 import { fairmarkitSourceSchema } from "@/lib/fairmarkit/schema";
+import { itemsAtFinalPrice } from "@/lib/utils/discount";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +47,9 @@ export async function GET(
         (await getCompanySettings())?.name ?? null,
       );
 
-  const plan = planFairmarkitExport(source, quotation.items);
+  // Fairmarkit takes one unit price per line, so item and overall discounts are
+  // folded into the lines: the bid adds up to the quotation's total.
+  const plan = planFairmarkitExport(source, itemsAtFinalPrice(quotation.items, quotation.discount_amount));
   const workbook = buildFairmarkitWorkbook(plan, quotation);
 
   // `BodyInit` in lib.dom does not admit Uint8Array<ArrayBufferLike>; the runtime does.

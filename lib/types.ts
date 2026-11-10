@@ -1,6 +1,7 @@
 // Row types mirroring supabase/migrations/0001_initial_schema.sql
 
 import type { FairmarkitSource } from "@/lib/fairmarkit/schema";
+import type { DiscountType } from "@/lib/utils/discount";
 
 export type DocType = "quotation" | "invoice" | "purchase_order" | "job_delivery";
 
@@ -73,7 +74,13 @@ export interface Quotation {
   vehicle_id: string | null;
   vehicle_label: string | null;
   job_title: string | null;
+  /** Σ line amounts — after item discounts, before the overall discount. */
   subtotal: number;
+  /** Whole-quotation discount: how `discount_value` is read, what was typed, and the ₦ it came to. */
+  discount_type: DiscountType;
+  discount_value: number;
+  discount_amount: number;
+  /** Final payable amount: subtotal − discount_amount. */
   total: number;
   amount_in_words: string | null;
   status: QuotationStatus;
@@ -93,7 +100,11 @@ export interface QuotationItem {
   qty: number;
   unit: string | null;
   rate: number | null;
+  /** Line NET — after the item discount. Gross is `amount + discount_amount`. */
   amount: number;
+  discount_type: DiscountType;
+  discount_value: number;
+  discount_amount: number;
 }
 
 export interface Invoice {

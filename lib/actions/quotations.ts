@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient, requireUser } from "@/lib/supabase/server";
-import { quotationSchema } from "@/lib/validation/documents";
+import { quotationSchema, type QuotationInput } from "@/lib/validation/documents";
 import { bumpDocumentCounter } from "@/lib/db/numbering";
 import { resolveVehicle } from "@/lib/db/vehicles";
 import { amountToWords } from "@/lib/utils/number-to-words";
 import { round2 } from "@/lib/utils/money";
+import { computeQuotation, discountIssueMessage } from "@/lib/utils/discount";
 import type { ActionState } from "@/lib/validation/shared";
 
 function parseItems(raw: FormDataEntryValue | null): unknown[] {
@@ -36,6 +37,8 @@ export async function saveQuotation(
     vehicle_label: formData.get("vehicle_label"),
     vehicle_reg_no: formData.get("vehicle_reg_no"),
     job_title: formData.get("job_title"),
+    discount_type: formData.get("discount_type"),
+    discount_value: formData.get("discount_value"),
     status: formData.get("status") || "draft",
     notes: formData.get("notes"),
     fairmarkit: formData.get("fairmarkit"),
@@ -51,6 +54,25 @@ export async function saveQuotation(
 
   const data = parsed.data;
 
+  // All money is derived here from qty / rate / discount inputs — client-sent
+  // line totals are never trusted (only a typed amount on a rate-less line).
+  const calc = computeQuotation(
+    data.items.map((it) => ({
+      qty: it.qty,
+      rate: it.rate,
+      amount: it.amount,
+      discount_type: it.discount_type,
+      discount_value: round2(it.discount_value),
+    })),
+    { type: data.discount_type, value: round2(data.discount_value) },
+  );
+
+  const discountErrors = discountProblems(data, calc);
+  if (discountErrors) return discountErrors;
+
+  const { subtotal, total } = calc;
+  const amount_in_words = amountToWords(total, { uppercase: true });
+
   // Register the vehicle (or link the existing one) so it gains a history.
   const vehicle = await resolveVehicle(
     {
@@ -62,10 +84,6 @@ export async function saveQuotation(
     user.id,
   );
 
-  const subtotal = round2(data.items.reduce((s, it) => s + it.amount, 0));
-  const total = subtotal;
-  const amount_in_words = amountToWords(total, { uppercase: true });
-
   const parent = {
     ref_no: data.ref_no,
     quote_date: data.quote_date,
@@ -76,6 +94,9 @@ export async function saveQuotation(
     vehicle_label: vehicle.label,
     job_title: data.job_title,
     subtotal,
+    discount_type: data.discount_type,
+    discount_value: round2(data.discount_value),
+    discount_amount: calc.discount,
     total,
     amount_in_words,
     status: data.status,
@@ -107,7 +128,11 @@ export async function saveQuotation(
     qty: it.qty,
     unit: it.unit,
     rate: it.rate,
-    amount: it.amount,
+    // `amount` is the line NET (after its discount); gross = amount + discount_amount.
+    amount: calc.lines[i].net,
+    discount_type: it.discount_type,
+    discount_value: round2(it.discount_value),
+    discount_amount: calc.lines[i].discount,
   }));
   const { error: itemsError } = await supabase.from("quotation_items").insert(items);
   if (itemsError) return { error: itemsError.message };
@@ -136,6 +161,38 @@ export async function setQuotationStatus(formData: FormData) {
   await supabase.from("quotations").update({ status }).eq("id", id);
   revalidatePath(`/quotations/${id}`);
   revalidatePath("/quotations");
+}
+
+/**
+ * A discount that cannot be honoured is rejected rather than silently clamped:
+ * a quotation that quietly prints a different discount from the one typed is
+ * worse than an error the user can fix in a second.
+ */
+function discountProblems(
+  data: QuotationInput,
+  calc: ReturnType<typeof computeQuotation>,
+): ActionState | null {
+  const problems: string[] = [];
+  calc.lines.forEach((line, i) => {
+    if (!line.issue) return;
+    problems.push(
+      discountIssueMessage(line.issue, {
+        label: data.items[i].description,
+        amount: line.gross,
+        noun: "line amount",
+      }),
+    );
+  });
+
+  const fieldErrors: Record<string, string[]> = {};
+  if (problems.length) fieldErrors.items = problems;
+  if (calc.discountIssue) {
+    fieldErrors.discount_value = [
+      discountIssueMessage(calc.discountIssue, { amount: calc.subtotal, noun: "sub-total" }),
+    ];
+  }
+
+  return Object.keys(fieldErrors).length ? { fieldErrors, error: "Check the discounts below." } : null;
 }
 
 function mapDbError(msg: string | undefined, uniqueField: string): string {

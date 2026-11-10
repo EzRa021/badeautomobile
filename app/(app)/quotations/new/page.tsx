@@ -24,7 +24,7 @@ export default async function NewQuotationPage({
   const seeded = vehicleId ? await getVehicle(vehicleId) : null;
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="New quotation"
         breadcrumbs={[{ label: "Quotations", href: "/quotations" }, { label: "New" }]}

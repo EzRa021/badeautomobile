@@ -36,6 +36,19 @@ the **TOTAL** row pinned near the bottom (y≈554).
 **Per item:** description, qty + unit (`1 Pcs`, `1 Set`, `4 Pcs`, `1 Lot`), rate
 (nullable — Labour had none), amount. **TOTAL** = Σ amounts. **AMOUNT IN WORDS** below.
 
+**Discounts (optional; the sample has none).** Two independent levels, each entered as a
+percentage or a fixed ₦ amount (`lib/utils/discount.ts` is the single source of the maths):
+
+- *Per item* — adds a `DISC. (₦)` column between RATE and AMOUNT (widths re-divided:
+  5.5 / 32 / 10 / 17 / 17 / 18.5 %). AMOUNT becomes the **line net** (qty × rate − discount).
+  The TOTAL row also carries the Σ of the discount column.
+- *Whole quotation* — no extra column; three summary rows replace the single TOTAL row:
+  `SUB-TOTAL` (Σ line nets) → `DISCOUNT (5%)` or `DISCOUNT` (shown as `-x`) → `TOTAL`.
+  They take the place of padding rows, so TOTAL stays pinned where the sample has it.
+
+A quotation with **no discount at all prints exactly as the sample** (verified byte-for-byte
+as a rasterised page against the pre-discount renderer).
+
 ## 2. Job Delivery Report (`JOB DELIVERY.pdf`)
 
 A form, not a table. Header: `GRN` and `PO No`, a boxed `Invoice No` / `Date` (top right),

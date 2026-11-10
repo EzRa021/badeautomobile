@@ -5,6 +5,7 @@ import { listCustomers, listVehicles, getQuotation, getCompanySettings } from "@
 import { peekDocumentNumber } from "@/lib/db/numbering";
 import { toDateInputValue } from "@/lib/utils/dates";
 import { toNumber } from "@/lib/utils/money";
+import { itemsAtFinalPrice } from "@/lib/utils/discount";
 import type { Row } from "@/components/app/line-items-editor";
 
 export const metadata: Metadata = { title: "New invoice" };
@@ -43,7 +44,9 @@ export default async function NewInvoicePage({
         customer_address: q.customer_address,
         vehicle_id: q.vehicle_id,
         vehicle_label: q.vehicle_label,
-        rows: q.items.map((it) => {
+        // Invoices have no discount lines, so discounts are folded into each unit price
+        // — otherwise converting a discounted quotation would bill the undiscounted rate.
+        rows: itemsAtFinalPrice(q.items, q.discount_amount).map((it) => {
           const unit = it.rate != null ? it.rate : it.qty ? toNumber(it.amount) / toNumber(it.qty) : 0;
           return {
             item_code: "",

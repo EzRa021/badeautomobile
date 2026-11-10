@@ -73,6 +73,13 @@ Build order. Each phase leaves the app in a runnable state.
       (buyer columns replayed, supplier columns NIL / priced)
 - [x] Works for quotations never imported from Fairmarkit (sheet is synthesised)
 
+## Phase 12 — Quotation discounts
+- [x] Per-item and whole-quotation discount (% or ₦), migration `0005_quotation_discounts.sql`
+- [x] `lib/utils/discount.ts` shared by form + server action; `npm test` covers the maths
+- [x] Form: "Discount per item" toggle, `DiscountInput`, live sub-total / discount / total
+- [x] PDF: `DISC. (₦)` column + SUB-TOTAL / DISCOUNT / TOTAL rows; undiscounted quotes unchanged
+- [x] Invoice conversion and Fairmarkit export use discounted prices (`itemsAtFinalPrice`)
+
 ## Phase 11 — Vehicle service history
 - [x] `vehicle_id` + printed snapshot on all four document types
       (migration `0004_vehicle_history.sql`, with backfill from existing free text)
