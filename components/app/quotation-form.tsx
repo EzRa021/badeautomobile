@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import type { QuotationWithItems } from "@/lib/types";
@@ -8,7 +8,8 @@ import type { FairmarkitImport } from "@/lib/fairmarkit/parse";
 import type { FairmarkitSource } from "@/lib/fairmarkit/schema";
 import type { ActionState } from "@/lib/validation/shared";
 import { saveQuotation } from "@/lib/actions/quotations";
-import { useFormDraft } from "@/lib/hooks/use-form-draft";
+import { draftKey, useFormDraft } from "@/lib/hooks/use-form-draft";
+import { DraftNotice } from "@/components/app/draft-notice";
 import { toNumber, round2, formatAmount, formatNaira } from "@/lib/utils/money";
 import {
   computeLine,
@@ -220,14 +221,18 @@ export function QuotationForm({
   }
 
   const draft = useFormDraft({
-    storageKey: `bade:draft:v1:quotation:${record?.id ?? "new"}`,
+    storageKey: draftKey("quotation", record?.id, { vehicle: defaultVehicle?.id }),
+    version: record?.updated_at,
+    actionState: state,
     formRef,
-    restore: (d) => {
-      if (d.items) {
+    restore: (d, changed) => {
+      if (changed.has("items") && d.items) {
         try {
           const restored = JSON.parse(d.items) as Row[];
-          setRows(restored);
-          setItemDiscounts(restored.some((r) => hasValue(r.discount_value)));
+          if (restored.length) {
+            setRows(restored);
+            setItemDiscounts(restored.some((r) => hasValue(r.discount_value)));
+          }
         } catch {
           /* ignore */
         }
@@ -253,12 +258,6 @@ export function QuotationForm({
     },
     deps: [rows, party, jobTitle, vehicle, fairmarkit, overall, itemDiscounts],
   });
-
-  // Keep the draft after a failed submit so a refresh doesn't lose the work.
-  useEffect(() => {
-    if (state.error || state.fieldErrors) draft.save();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
 
   const columns = useMemo(() => discountColumns(itemDiscounts), [itemDiscounts]);
   const cleanRows = useMemo(() => rows.filter((r) => r.description.trim()), [rows]);
@@ -323,12 +322,13 @@ export function QuotationForm({
   ];
 
   return (
-    <form ref={formRef} action={formAction} onSubmit={() => draft.clear()} className="space-y-5">
+    <form ref={formRef} action={formAction} className="space-y-5">
       {record && <input type="hidden" name="id" value={record.id} />}
       <input type="hidden" name="items" value={JSON.stringify(submittedItems)} />
       <input type="hidden" name="discount_type" value={overall.type} />
       <input type="hidden" name="discount_value" value={overall.value} />
       <input type="hidden" name="fairmarkit" value={fairmarkit ? JSON.stringify(fairmarkit) : ""} />
+      <DraftNotice restoredAt={draft.restoredAt} onDiscard={draft.discard} />
 
       <Card>
         <CardHeader>

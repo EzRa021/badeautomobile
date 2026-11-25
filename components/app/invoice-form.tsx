@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import type { InvoiceWithItems } from "@/lib/types";
 import type { ActionState } from "@/lib/validation/shared";
 import { saveInvoice } from "@/lib/actions/invoices";
-import { useFormDraft } from "@/lib/hooks/use-form-draft";
+import { draftKey, useFormDraft } from "@/lib/hooks/use-form-draft";
+import { DraftNotice } from "@/components/app/draft-notice";
 import { toNumber, round2 } from "@/lib/utils/money";
 import { amountToWords } from "@/lib/utils/number-to-words";
 import { LineItemsEditor, emptyRow, type Row, type ColumnDef } from "@/components/app/line-items-editor";
@@ -97,12 +98,15 @@ export function InvoiceForm({
   const formRef = useRef<HTMLFormElement>(null);
 
   const draft = useFormDraft({
-    storageKey: `bade:draft:v1:invoice:${record?.id ?? "new"}`,
+    storageKey: draftKey("invoice", record?.id, { quotation: fromQuotationId }),
+    version: record?.updated_at,
+    actionState: state,
     formRef,
-    restore: (d) => {
-      if (d.items) {
+    restore: (d, changed) => {
+      if (changed.has("items") && d.items) {
         try {
-          setRows((JSON.parse(d.items) as Row[]).map(deriveRow));
+          const restored = JSON.parse(d.items) as Row[];
+          if (restored.length) setRows(restored.map(deriveRow));
         } catch {
           /* ignore */
         }
@@ -117,11 +121,6 @@ export function InvoiceForm({
     },
     deps: [rows, party, vatRate, vehicle],
   });
-
-  useEffect(() => {
-    if (state.error || state.fieldErrors) draft.save();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
 
   function applyImport(p: ParsedPo) {
     if (Array.isArray(p.items) && p.items.length) {
@@ -157,12 +156,13 @@ export function InvoiceForm({
   const words = useMemo(() => amountToWords(total), [total]);
 
   return (
-    <form ref={formRef} action={formAction} onSubmit={() => draft.clear()} className="space-y-5">
+    <form ref={formRef} action={formAction} className="space-y-5">
       {record && <input type="hidden" name="id" value={record.id} />}
       {(fromQuotationId || record?.quotation_id) && (
         <input type="hidden" name="quotation_id" value={record?.quotation_id ?? fromQuotationId ?? ""} />
       )}
       <input type="hidden" name="items" value={JSON.stringify(cleanRows.map(({ amount: _a, ...r }) => r))} />
+      <DraftNotice restoredAt={draft.restoredAt} onDiscard={draft.discard} />
 
       <Card className="border-primary/30 bg-brand-050/50">
         <CardContent className="flex flex-col gap-3 pt-5 sm:flex-row sm:items-center sm:justify-between">

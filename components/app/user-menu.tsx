@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { LogOut, Settings, User } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
+import { clearAllDrafts } from "@/lib/hooks/use-form-draft";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -38,7 +39,7 @@ export function UserMenu({ email }: { email: string }) {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <form action={signOut}>
+        <form action={signOut} onSubmit={clearAllDrafts}>
           <DropdownMenuItem asChild variant="destructive">
             <button type="submit" className="w-full">
               <LogOut className="size-4" /> Sign out

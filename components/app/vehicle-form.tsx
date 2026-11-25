@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useRef } from "react";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import type { Vehicle, Customer } from "@/lib/types";
 import type { ActionState } from "@/lib/validation/shared";
 import { saveVehicle } from "@/lib/actions/vehicles";
-import { useFormDraft } from "@/lib/hooks/use-form-draft";
+import { draftKey, useFormDraft } from "@/lib/hooks/use-form-draft";
+import { DraftNotice } from "@/components/app/draft-notice";
 import { FormField } from "@/components/app/form-field";
 import { FormActionBar } from "@/components/app/form-action-bar";
 import { SubmitButton } from "@/components/app/submit-button";
@@ -28,18 +29,16 @@ export function VehicleForm({
   const formRef = useRef<HTMLFormElement>(null);
 
   const draft = useFormDraft({
-    storageKey: `bade:draft:v1:vehicle:${record?.id ?? "new"}`,
+    storageKey: draftKey("vehicle", record?.id),
+    version: record?.updated_at,
+    actionState: state,
     formRef,
   });
 
-  useEffect(() => {
-    if (state.error || state.fieldErrors) draft.save();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
-
   return (
-    <form ref={formRef} action={formAction} onSubmit={() => draft.clear()}>
+    <form ref={formRef} action={formAction}>
       {record && <input type="hidden" name="id" value={record.id} />}
+      <DraftNotice restoredAt={draft.restoredAt} onDiscard={draft.discard} className="mb-4" />
       <Card>
         <CardContent className="grid gap-5 pt-5 sm:grid-cols-2">
           <FormField label="Description" htmlFor="description" required error={fe.description?.[0]} className="sm:col-span-2" hint="e.g. Toyota Prado AGL 58EW">

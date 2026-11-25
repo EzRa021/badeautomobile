@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, FileText, Receipt, Menu, LogOut } from "lucide-react";
 import { NAV } from "@/lib/nav";
 import { signOut } from "@/lib/actions/auth";
+import { clearAllDrafts } from "@/lib/hooks/use-form-draft";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { cn } from "@/lib/utils/cn";
 
@@ -93,7 +94,7 @@ export function MobileTabBar() {
             </div>
           ))}
 
-          <form action={signOut} className="pt-1">
+          <form action={signOut} onSubmit={clearAllDrafts} className="pt-1">
             <button
               type="submit"
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-destructive/30 px-3 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"

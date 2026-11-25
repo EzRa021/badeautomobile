@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import type { JobDelivery } from "@/lib/types";
 import type { ActionState } from "@/lib/validation/shared";
 import { saveJobDelivery } from "@/lib/actions/job-deliveries";
-import { useFormDraft } from "@/lib/hooks/use-form-draft";
+import { draftKey, useFormDraft } from "@/lib/hooks/use-form-draft";
+import { DraftNotice } from "@/components/app/draft-notice";
 import { toDateTimeInputValue } from "@/lib/utils/dates";
 import { PartyPicker, type PartyOption, type PartyValue } from "@/components/app/party-picker";
 import { VehiclePicker, type VehicleOption, type VehicleValue } from "@/components/app/vehicle-picker";
@@ -25,6 +26,7 @@ export function JobDeliveryForm({
   vehicles,
   defaultNo,
   defaultDate,
+  fromQuotationId,
   seed,
 }: {
   record?: JobDelivery;
@@ -32,6 +34,8 @@ export function JobDeliveryForm({
   vehicles: VehicleOption[];
   defaultNo: string;
   defaultDate: string;
+  /** Quotation this report is being started from (keeps its unsaved changes apart). */
+  fromQuotationId?: string;
   seed?: {
     customer_id?: string | null;
     customer_name?: string;
@@ -56,7 +60,12 @@ export function JobDeliveryForm({
   const formRef = useRef<HTMLFormElement>(null);
 
   const draft = useFormDraft({
-    storageKey: `bade:draft:v1:job_delivery:${record?.id ?? "new"}`,
+    storageKey: draftKey("job_delivery", record?.id, {
+      quotation: fromQuotationId,
+      vehicle: seed?.vehicle_id,
+    }),
+    version: record?.updated_at,
+    actionState: state,
     formRef,
     restore: (d) => {
       setParty({ id: d.customer_id ?? "", name: d.customer_name ?? "", address: d.customer_address ?? "" });
@@ -69,14 +78,10 @@ export function JobDeliveryForm({
     deps: [party, vehicle],
   });
 
-  useEffect(() => {
-    if (state.error || state.fieldErrors) draft.save();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
-
   return (
-    <form ref={formRef} action={formAction} onSubmit={() => draft.clear()} className="space-y-5">
+    <form ref={formRef} action={formAction} className="space-y-5">
       {record && <input type="hidden" name="id" value={record.id} />}
+      <DraftNotice restoredAt={draft.restoredAt} onDiscard={draft.discard} />
 
       <Card>
         <CardHeader>

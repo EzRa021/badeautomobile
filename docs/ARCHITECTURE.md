@@ -94,3 +94,15 @@ dashboard (Authentication → Users) — see `README`/`docs/PLAN.md`.
 - List pages read filters from `searchParams` (server-side search/sort/status/date-range/
   paging) and render `components/app/data-table.tsx` — a table on desktop, cards on
   phones, with inline status changes. See `docs/LISTS.md`.
+- Create/edit forms keep unsaved work with `lib/hooks/use-form-draft.ts` (localStorage):
+  - It saves as you type, and restores the work when you come back, with a "Discard
+    changes" notice (`components/app/draft-notice.tsx`).
+  - Only fields the user changed come back. Untouched ones (a fresh document number, the
+    record's current data) keep today's values.
+  - The draft is deleted once the save redirects. If the save fails, the draft is kept
+    and the typed values are put back on screen (React resets uncontrolled fields after
+    every form action).
+  - Edit drafts carry the record's `updated_at` and are dropped if the record has changed
+    since. Drafts expire after 7 days and are cleared on sign-out.
+  - New forms: key with `draftKey(kind, record?.id, { …what the form was seeded from })`,
+    and pass `version: record?.updated_at` and `actionState: state`.

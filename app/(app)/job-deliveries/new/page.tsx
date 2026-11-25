@@ -63,6 +63,7 @@ export default async function NewJobDeliveryPage({
         vehicles={vehicles}
         defaultNo={defaultNo}
         defaultDate={toDateInputValue(new Date())}
+        fromQuotationId={from_quotation}
         seed={seed}
       />
     </div>
